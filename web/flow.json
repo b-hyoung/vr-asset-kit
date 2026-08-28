@@ -7,9 +7,10 @@
       "title": "환경·도구 체크",
       "gate": true,
       "user_input": true,
+      "diagnostic": true,
       "engines": [],
       "doc_ref": "SETUP.md",
-      "desc": "OpenAI 키·Hunyuan3D·언리얼 MCP 준비 확인. 하나라도 빠지면 진행 잠금."
+      "desc": "필요 환경/도구를 리스트업하고 실제로 진단한다. 핵심(★) 항목: OpenAI 키·Hunyuan 모델·UnrealClaude MCP. 진단을 돌린 뒤 확정할 수 있다."
     },
     {
       "id": "topic",

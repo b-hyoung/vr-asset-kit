@@ -8,6 +8,8 @@ let PID = null;        // 현재 프로젝트 id
 let STATE = null;      // 현재 프로젝트 state.json
 let SELECTED = null;   // 중앙에 표시 중인 step id
 let sse = null;
+let DIAG = null;       // 마지막 진단 결과
+let DIAG_DONE = false;  // 이번 프로젝트에서 진단을 한 번이라도 돌렸는가
 
 const $ = (id) => document.getElementById(id);
 const api = async (url, opts) => {
@@ -67,6 +69,7 @@ async function selectProject(id) {
   PID = id;
   STATE = await api(`/api/projects/${id}/state`);
   SELECTED = STATE.current_step;
+  DIAG = null; DIAG_DONE = false;   // 프로젝트 바뀌면 진단 초기화
   connectSSE(id);
   renderAll();
 }
@@ -131,6 +134,11 @@ function renderCenter() {
     html += `<div class="locknote">🔒 이전 게이트가 통과되지 않아 잠겨 있습니다. 앞 단계를 먼저 확정하세요.</div>`;
   }
 
+  // 진단 단계 (환경·도구 체크)
+  if (s.diagnostic && !locked) {
+    html += renderDiagnosticBlock();
+  }
+
   // 입력 필드
   const inputs = s.inputs || [];
   if (inputs.length) {
@@ -169,12 +177,12 @@ function renderCenter() {
   // 게이트 버튼
   if (s.gate) {
     const passed = st.gate_passed;
-    const canPass = !locked && inputsFilled(s);
+    const canPass = !locked && stepReady(s);
     html += `<div class="gatebox">
       <div class="g-title">GATE — 사용자 확정 지점 ${passed ? "✅ 통과됨 (" + (st.passed_by || "") + ")" : ""}</div>`;
     if (!passed) {
       html += `<button class="btn gate" ${canPass ? "" : "disabled"} onclick="passGate('${s.id}')">이 단계 확정 → 다음 잠금 해제</button>`;
-      if (!canPass && !locked) html += `<div class="locknote">필수 입력을 먼저 채워야 확정할 수 있습니다.</div>`;
+      if (!canPass && !locked) html += `<div class="locknote">${s.diagnostic ? "먼저 '진단 시작'을 눌러 환경을 진단하세요." : "필수 입력을 먼저 채워야 확정할 수 있습니다."}</div>`;
     } else {
       html += `<button class="btn undo" onclick="undoGate('${s.id}')">확정 취소</button>`;
     }
@@ -230,6 +238,66 @@ async function loadExampleBody() {
     ).join("");
   } catch (e) { el.textContent = "(예시 불러오기 실패)"; }
 }
+
+// ---------- 진단 (환경·도구 체크) ----------
+function renderDiagnosticBlock() {
+  let h = `<div style="margin-top:6px">
+    <div class="hint" style="margin-bottom:8px">필요 환경/도구를 진단합니다. <b style="color:var(--gate)">★</b> = 핵심 필수(OpenAI 키·Hunyuan 모델·UnrealClaude MCP).</div>
+    <button class="btn small" id="diagBtn" onclick="runDiagnose()">진단 시작</button>
+    <span id="diagStatus" class="hint" style="margin-left:8px"></span>
+    <div id="diagResult" style="margin-top:10px"></div>
+  </div>`;
+  // 이미 이번 세션에 진단했으면 결과 복원
+  if (DIAG) {
+    setTimeout(() => { paintDiag(DIAG); }, 0);
+  }
+  return h;
+}
+
+function paintDiag(d) {
+  const stat = $("diagStatus"), res = $("diagResult");
+  if (!stat || !res) return;
+  const miss = d.required_missing || [];
+  stat.innerHTML = `진단 완료 · OK ${d.ok}/${d.total} · ` +
+    (miss.length
+      ? `<span style="color:var(--warn)">핵심 확인필요: ${escapeHtml(miss.join(", "))}</span>`
+      : `<span style="color:var(--good)">핵심 준비됨 ✅</span>`);
+  res.innerHTML = renderDiagItems(d.items || []);
+}
+
+function renderDiagItems(items) {
+  const cats = {};
+  items.forEach((i) => { (cats[i.category] = cats[i.category] || []).push(i); });
+  let h = "";
+  for (const c of Object.keys(cats)) {
+    h += `<div style="margin-top:10px;font-size:11px;color:var(--faint);font-family:var(--mono)">${escapeHtml(c)}</div>`;
+    for (const i of cats[c]) {
+      const icon = i.ok ? "✅" : (i.required ? "⛔" : "⚠");
+      const col = i.ok ? "var(--good)" : (i.required ? "var(--bad)" : "var(--warn)");
+      h += `<div style="display:flex;gap:8px;padding:3px 0;font-size:12.5px;align-items:baseline">
+        <span style="color:${col};width:16px;flex:none">${icon}</span>
+        <span style="min-width:170px;flex:none">${escapeHtml(i.name)}${i.required ? ' <b style="color:var(--gate)">★</b>' : ''}</span>
+        <span class="faint" style="font-size:11.5px">${escapeHtml(i.detail)}</span></div>`;
+    }
+  }
+  return h;
+}
+
+window.runDiagnose = async () => {
+  const btn = $("diagBtn"), stat = $("diagStatus"), res = $("diagResult");
+  if (btn) btn.disabled = true;
+  if (stat) stat.innerHTML = `<span style="color:var(--accent)">진단중…</span>`;
+  if (res) res.innerHTML = "";
+  try {
+    const d = await api("/api/diagnose");
+    DIAG = d; DIAG_DONE = true;
+    paintDiag(d);
+    updateGateButtons();  // 진단 완료 → 게이트 버튼 활성화
+  } catch (e) {
+    if (stat) stat.textContent = "진단 실패: " + e.message;
+  }
+  if (btn) { btn.disabled = false; btn.textContent = "다시 진단"; }
+};
 
 function renderAudit() {
   const box = $("auditLog");
@@ -303,7 +371,7 @@ function updateGateButtons() {
   const s = stepDef(SELECTED);
   if (!s || !s.gate) return;
   const btn = document.querySelector(".gatebox .btn.gate");
-  if (btn) btn.disabled = !inputsFilled(s);
+  if (btn) btn.disabled = !stepReady(s);
 }
 
 // ---------- 플로우 편집 ----------
@@ -325,6 +393,11 @@ async function saveFlow() {
 }
 
 // ---------- 헬퍼 ----------
+function stepReady(s) {
+  // 진단 단계는 진단을 한 번 돌려야 확정 가능. 그 외는 필수 입력이 채워져야.
+  if (s.diagnostic) return DIAG_DONE;
+  return inputsFilled(s);
+}
 function inputsFilled(s) {
   if (!s.inputs || !s.inputs.length) return true;
   for (const f of s.inputs) {

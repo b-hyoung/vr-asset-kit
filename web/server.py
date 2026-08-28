@@ -24,6 +24,11 @@ import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, unquote
 
+try:
+    import diag  # 환경·도구 진단 (check-env.ps1 포팅)
+except Exception:
+    diag = None
+
 BASE = os.path.dirname(os.path.abspath(__file__))          # .../vr-harness/web
 HARNESS_ROOT = os.path.dirname(BASE)                        # .../vr-harness
 STATIC = os.path.join(BASE, "static")
@@ -228,6 +233,15 @@ class Handler(BaseHTTPRequestHandler):
             if st is None:
                 return self._json({"error": "no project"}, 404)
             return self._json(st)
+        if p == "/api/diagnose":
+            if diag is None:
+                return self._json({"error": "diag 모듈 로드 실패"}, 500)
+            try:
+                hd = (q.get("hunyuan_dir", [None])[0]) or None
+                ef = (q.get("env_file", [None])[0]) or None
+                return self._json(diag.run(hunyuan_dir=hd, env_file=ef))
+            except Exception as e:
+                return self._json({"error": "진단 실패: %r" % e}, 500)
         if p == "/api/doc":
             ref = (q.get("ref", [""])[0]) or ""
             return self._serve_doc(ref)
