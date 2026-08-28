@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VR 제작킷 콘솔</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">VR 제작킷 콘솔 <small>로컬 · 플로우 강제 · 실시간 문서</small></div>
+  <div class="spacer"></div>
+  <select id="projectSelect" title="프로젝트 선택"></select>
+  <button id="newProjectBtn" class="primary">+ 새 프로젝트</button>
+  <button id="editFlowBtn" class="ghost">⚙ 플로우 편집</button>
+</div>
+
+<div class="panes">
+  <!-- 좌: 플로우 진행 -->
+  <div class="pane left">
+    <h2>플로우</h2>
+    <div id="flowList"></div>
+  </div>
+
+  <!-- 중: 현재 단계 작업 -->
+  <div class="pane center" id="centerPane">
+    <div class="empty" id="centerEmpty">프로젝트를 만들거나 선택하세요.</div>
+    <div id="stepDetail" style="display:none"></div>
+  </div>
+
+  <!-- 우: 문서·프롬프트 실시간 + 감사로그 -->
+  <div class="pane right">
+    <h2>하네스 문서 · 실시간</h2>
+    <div id="docTitle" class="hint" style="margin-bottom:6px"></div>
+    <div id="docView" class="docview">단계를 선택하면 관련 문서가 여기 표시됩니다.</div>
+    <div class="audit">
+      <h2 style="margin-top:16px">감사 로그</h2>
+      <div id="auditLog"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 플로우 편집 오버레이 -->
+<div class="overlay" id="flowOverlay">
+  <div class="modal">
+    <h3>플로우 편집 (flow.json)</h3>
+    <p class="hint">단계·게이트·엔진을 직접 편집합니다. 저장하면 모든 대시보드에 즉시 반영됩니다. (JSON 형식 유지)</p>
+    <textarea id="flowEditor" spellcheck="false"></textarea>
+    <div class="hint" id="flowEditErr" style="color:var(--bad)"></div>
+    <div class="row">
+      <button class="btn small" id="flowCancel">취소</button>
+      <button class="btn gate" id="flowSave">저장</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "note": "단계별 선택 가능한 엔진/모델 레지스트리. flow.json 의 각 단계 engines[].role 이 여기를 참조.",
+  "roles": {
+    "image": {
+      "label": "이미지 생성",
+      "choices": ["gpt-image-1", "higgsfield", "sdxl-local"],
+      "default": "gpt-image-1"
+    },
+    "mesh_3d": {
+      "label": "이미지 → 3D",
+      "choices": ["Hunyuan3D-2(standalone)", "Rodin(Hyper3D)", "Blender-MCP"],
+      "default": "Hunyuan3D-2(standalone)"
+    },
+    "judge": {
+      "label": "배치/품질 심판",
+      "choices": ["OpenAI", "Claude", "사용자 수동"],
+      "default": "OpenAI"
+    },
+    "orchestration": {
+      "label": "오케스트레이션/제어",
+      "choices": ["Claude", "GPT"],
+      "default": "Claude"
+    }
+  }
+}
