@@ -3,8 +3,8 @@
   "roles": {
     "image": {
       "label": "이미지 생성",
-      "choices": ["로컬 이미지(SDXL/ComfyUI)", "gpt-image-1", "higgsfield"],
-      "default": "로컬 이미지(SDXL/ComfyUI)"
+      "choices": ["FLUX.2 [dev] (로컬 diffusers)", "SD 3.5 Large (로컬)", "Qwen-Image (로컬)", "gpt-image-1"],
+      "default": "FLUX.2 [dev] (로컬 diffusers)"
     },
     "mesh_3d": {
       "label": "이미지 → 3D",
