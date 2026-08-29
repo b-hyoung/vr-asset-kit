@@ -355,8 +355,8 @@ function buildDiagStages(data, pending) {
   items.forEach((i) => { (byStage[i.stage] = byStage[i.stage] || []).push(i); });
   const shown = stages.filter((s) => (byStage[s.key] || []).length);
 
-  // 한 단계 카드 HTML. areaCls 로 grid-area 지정.
-  const card = (s, oi, areaCls) => {
+  // 한 단계 카드 HTML.
+  const card = (s, oi) => {
     const list = byStage[s.key] || [];
     let badge = `<span class="stage-count">—</span>`, cardCls = "";
     if (!pending) {
@@ -366,7 +366,7 @@ function buildDiagStages(data, pending) {
       badge = `<span class="stage-count ${reqMiss ? "bad" : (ok === rel.length ? "good" : "")}">${ok}/${rel.length}</span>`;
       cardCls = reqMiss ? "stage-bad" : (ok === rel.length ? "stage-good" : "");
     }
-    let h = `<div class="diag-stage ${cardCls} ${areaCls}"><div class="stage-order">${oi + 1}</div><div class="diag-stage-h">${escapeHtml(s.label)} ${badge}</div>`;
+    let h = `<div class="diag-stage ${cardCls}"><div class="stage-order">${oi + 1}</div><div class="diag-stage-h">${escapeHtml(s.label)} ${badge}</div>`;
     for (const i of list) {
       const rel = pending ? true : itemRelevant(i.dep);
       const st = pending ? "pending" : (!rel ? "irrelevant" : (i.ok ? "ok" : (i.required ? "req" : "warn")));
@@ -380,21 +380,12 @@ function buildDiagStages(data, pending) {
     return h + `</div>`;
   };
 
-  // 4개면 서펜타인 그리드: 카드와 화살표를 실제 grid-area 칸에 배치 (gutter에 정확히)
-  if (shown.length === 4) {
-    return `<div class="diag-grid serp">`
-      + card(shown[0], 0, "g-c1")
-      + `<div class="gap-arrow g-a1">→</div>`
-      + card(shown[1], 1, "g-c2")
-      + `<div class="gap-arrow g-a2">↓</div>`
-      + card(shown[2], 2, "g-c3")
-      + `<div class="gap-arrow g-a3">←</div>`
-      + card(shown[3], 3, "g-c4")
-      + `</div>`;
-  }
-  // 폴백: 단순 그리드 (4개 아닐 때)
-  let h = `<div class="diag-grid plain">`;
-  shown.forEach((s, oi) => { h += card(s, oi, ""); });
+  // 차분한 세로 스택: 1→2→3→4 위에서 아래로, 단계 사이 ↓
+  let h = `<div class="diag-stack">`;
+  shown.forEach((s, oi) => {
+    if (oi > 0) h += `<div class="stack-arrow">↓</div>`;
+    h += card(s, oi);
+  });
   return h + `</div>`;
 }
 
