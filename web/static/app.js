@@ -308,25 +308,25 @@ function buildDiagStages(data, pending) {
   const items = data.items || [];
   const byStage = {};
   items.forEach((i) => { (byStage[i.stage] = byStage[i.stage] || []).push(i); });
-  let h = "";
-  stages.forEach((s, idx) => {
+  let h = `<div class="diag-grid">`;
+  stages.forEach((s) => {
     const list = byStage[s.key] || [];
     if (!list.length) return;
-    let badge = "";
+    let badge = `<span class="stage-count">—</span>`;
+    let cardCls = "";
     if (!pending) {
       const ok = list.filter((i) => i.ok).length;
       const reqMiss = list.some((i) => i.required && !i.ok);
       const cls = reqMiss ? "bad" : (ok === list.length ? "good" : "");
       badge = `<span class="stage-count ${cls}">${ok}/${list.length}</span>`;
+      cardCls = reqMiss ? "stage-bad" : (ok === list.length ? "stage-good" : "");
     }
-    // 단계 사이 화살표 (순서 강조)
-    if (idx > 0) h += `<div class="stage-arrow">▼</div>`;
-    h += `<div class="diag-stage"><div class="diag-stage-h">${escapeHtml(s.label)} ${badge}</div>`;
+    h += `<div class="diag-stage ${cardCls}"><div class="diag-stage-h">${escapeHtml(s.label)} ${badge}</div>`;
     for (const i of list) {
       const st = pending ? "pending" : (i.ok ? "ok" : (i.required ? "req" : "warn"));
       const icon = st === "ok" ? "✓" : st === "req" ? "✕" : st === "warn" ? "!" : "";
       const detail = pending ? (i.need || "") : (i.detail || "");
-      h += `<div class="diag-row ${st}">
+      h += `<div class="diag-row ${st}" title="${escapeAttr(detail)}">
         <div class="box">${icon}</div>
         <div class="grow">
           <div class="nm">${escapeHtml(i.name)}${i.required ? '<span class="diag-star">★</span>' : ''}</div>
@@ -336,7 +336,7 @@ function buildDiagStages(data, pending) {
     }
     h += `</div>`;
   });
-  return h;
+  return h + `</div>`;
 }
 
 window.runDiagnose = async () => {
@@ -364,12 +364,58 @@ function renderAudit() {
 }
 
 async function loadDoc(ref) {
-  if (!ref) { $("docView").textContent = "(연결된 문서 없음)"; $("docTitle").textContent = ""; return; }
+  if (!ref) { $("docView").innerHTML = "<p class='faint'>(연결된 문서 없음)</p>"; $("docTitle").textContent = ""; return; }
   $("docTitle").textContent = "📄 " + ref;
   try {
     const d = await api("/api/doc?ref=" + encodeURIComponent(ref));
-    $("docView").textContent = d.text || "(빈 문서)";
-  } catch (e) { $("docView").textContent = "(문서 로드 실패: " + ref + ")"; }
+    $("docView").innerHTML = mdToHtml(d.text || "(빈 문서)");
+  } catch (e) { $("docView").innerHTML = "<p class='faint'>(문서 로드 실패: " + escapeHtml(ref) + ")</p>"; }
+}
+
+// 경량 마크다운 렌더러 (외부 의존성 없음)
+function mdToHtml(src) {
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const inline = (s) => s
+    .replace(/`([^`]+)`/g, (m, c) => `<code>${c}</code>`)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
+
+  const lines = esc(src).split(/\r?\n/);
+  let html = "", inCode = false, codeBuf = [], listType = null, listBuf = [], tableBuf = [];
+  const closeList = () => { if (listType) { html += `<${listType}>` + listBuf.join("") + `</${listType}>`; listType = null; listBuf = []; } };
+  const closeTable = () => {
+    if (!tableBuf.length) return;
+    let out = "<table>";
+    tableBuf.forEach((r, idx) => {
+      if (/^\s*\|?[\s:|-]*-{2,}[\s:|-]*\|?\s*$/.test(r)) return; // 구분선
+      const cells = r.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map((c) => c.trim());
+      const tag = idx === 0 ? "th" : "td";
+      out += "<tr>" + cells.map((c) => `<${tag}>${inline(c)}</${tag}>`).join("") + "</tr>";
+    });
+    html += out + "</table>"; tableBuf = [];
+  };
+  for (const ln of lines) {
+    if (/^```/.test(ln)) {
+      if (inCode) { html += `<pre><code>${codeBuf.join("\n")}</code></pre>`; codeBuf = []; inCode = false; }
+      else { closeList(); closeTable(); inCode = true; }
+      continue;
+    }
+    if (inCode) { codeBuf.push(ln); continue; }
+    if (/^\s*\|.*\|\s*$/.test(ln)) { closeList(); tableBuf.push(ln); continue; } else closeTable();
+    let m;
+    if ((m = ln.match(/^(#{1,6})\s+(.*)$/))) { closeList(); html += `<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`; continue; }
+    if (/^\s*[-*]\s+/.test(ln)) { if (listType !== "ul") { closeList(); listType = "ul"; } listBuf.push(`<li>${inline(ln.replace(/^\s*[-*]\s+/, ""))}</li>`); continue; }
+    if (/^\s*\d+\.\s+/.test(ln)) { if (listType !== "ol") { closeList(); listType = "ol"; } listBuf.push(`<li>${inline(ln.replace(/^\s*\d+\.\s+/, ""))}</li>`); continue; }
+    closeList();
+    if (/^\s*>\s?/.test(ln)) { html += `<blockquote>${inline(ln.replace(/^\s*>\s?/, ""))}</blockquote>`; continue; }
+    if (/^\s*(---|\*\*\*|___)\s*$/.test(ln)) { html += "<hr>"; continue; }
+    if (ln.trim() === "") continue;
+    html += `<p>${inline(ln)}</p>`;
+  }
+  closeList(); closeTable();
+  if (inCode) html += `<pre><code>${codeBuf.join("\n")}</code></pre>`;
+  return html;
 }
 
 // ---------- 입력 이벤트 배선 ----------
