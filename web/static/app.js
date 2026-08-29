@@ -313,10 +313,16 @@ function buildDiagStages(data, pending) {
   const items = data.items || [];
   const byStage = {};
   items.forEach((i) => { (byStage[i.stage] = byStage[i.stage] || []).push(i); });
-  let h = `<div class="diag-grid">`;
-  stages.forEach((s) => {
+  // 아이템이 있는 단계만 (순서 번호용)
+  const shown = stages.filter((s) => (byStage[s.key] || []).length);
+  // ㄹ(지그재그) 순서 화살표 — 2열 그리드를 스네이크로 관통
+  const snake = shown.length >= 2 ? `<svg class="snake" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <defs><marker id="snakeArrow" markerWidth="5" markerHeight="5" refX="2.5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="var(--accent)"/></marker></defs>
+    <polyline points="26,24 74,24 74,50 26,50 26,76 74,76" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" marker-end="url(#snakeArrow)"/>
+  </svg>` : "";
+  let h = `<div class="diag-grid">` + snake;
+  shown.forEach((s, oi) => {
     const list = byStage[s.key] || [];
-    if (!list.length) return;
     let badge = `<span class="stage-count">—</span>`;
     let cardCls = "";
     if (!pending) {
@@ -326,7 +332,7 @@ function buildDiagStages(data, pending) {
       badge = `<span class="stage-count ${cls}">${ok}/${list.length}</span>`;
       cardCls = reqMiss ? "stage-bad" : (ok === list.length ? "stage-good" : "");
     }
-    h += `<div class="diag-stage ${cardCls}"><div class="diag-stage-h">${escapeHtml(s.label)} ${badge}</div>`;
+    h += `<div class="diag-stage ${cardCls}"><div class="stage-order">${oi + 1}</div><div class="diag-stage-h">${escapeHtml(s.label)} ${badge}</div>`;
     for (const i of list) {
       const st = pending ? "pending" : (i.ok ? "ok" : (i.required ? "req" : "warn"));
       const icon = st === "ok" ? "✓" : st === "req" ? "✕" : st === "warn" ? "!" : "";
