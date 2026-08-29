@@ -18,7 +18,7 @@ STAGES = [
 # 항목 이름 → 어느 단계에서 필요한지
 NAME_STAGE = {
     "python (py 포함)": "base", "uv": "base", "node": "base", "git": "base",
-    "OPENAI_API_KEY": "image",
+    "로컬 이미지 서버": "image", "OPENAI_API_KEY": "image",
     "Blender (선택)": "mesh",
     "CUDA / GPU (nvidia-smi)": "mesh",
     "Hunyuan3D-2 레포": "mesh", "venv (PyTorch)": "mesh",
@@ -61,7 +61,8 @@ def spec():
         {"name": "node", "required": False, "need": "MCP 브릿지 실행"},
         {"name": "git", "required": False, "need": "버전관리 (선택)"},
         {"name": "uv", "required": False, "need": "파이썬 패키지 관리 (선택)"},
-        {"name": "OPENAI_API_KEY", "required": False, "need": "기본은 로컬 이미지 — gpt-image-1 엔진 고를 때만 필요"},
+        {"name": "로컬 이미지 서버", "required": False, "need": "기본 이미지 엔진 — ComfyUI(:8188)/A1111(:7860) 로컬 서버"},
+        {"name": "OPENAI_API_KEY", "required": False, "need": "대안 — gpt-image-1 엔진 고를 때만 필요"},
         {"name": "Blender (선택)", "required": False, "need": "블록아웃/레퍼런스 쓸 때만"},
         {"name": "CUDA / GPU (nvidia-smi)", "required": True, "need": "3D 생성 GPU 가속 — NVIDIA 드라이버+CUDA"},
         {"name": "Hunyuan3D-2 레포", "required": False, "need": "이미지→3D 로컬 레포"},
@@ -108,6 +109,13 @@ def run(hunyuan_dir=None, env_file=None):
 
     # === B. 이미지 생성 (기본 로컬, gpt-image 선택 시 OpenAI 키) ===
     B = "B. 이미지 생성"
+    # 로컬 이미지 서버: ComfyUI(:8188) / A1111(:7860)
+    comfy = _port_open(8188)
+    a1111 = _port_open(7860)
+    where = "ComfyUI :8188" if comfy else ("A1111 :7860" if a1111 else "")
+    add(B, "로컬 이미지 서버", bool(where),
+        (where + " 응답") if where else "ComfyUI(:8188)/A1111(:7860) 미검출 — 이미지 생성 전에 켤 것",
+        required=False)
     key_found, key_where = False, ""
     candidates = []
     if env_file:
