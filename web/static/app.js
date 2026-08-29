@@ -10,6 +10,8 @@ let SELECTED = null;   // 중앙에 표시 중인 step id
 let sse = null;
 let DIAG = null;       // 마지막 진단 결과
 let DIAG_DONE = false;  // 이번 프로젝트에서 진단을 한 번이라도 돌렸는가
+let DOC_FULL = "";     // 현재 문서 전체 텍스트 (더보기 모달용)
+let DOC_REF = "";      // 현재 문서 ref
 
 const $ = (id) => document.getElementById(id);
 const api = async (url, opts) => {
@@ -30,6 +32,9 @@ async function init() {
   $("projectSelect").onchange = (e) => selectProject(e.target.value);
   $("flowCancel").onclick = () => $("flowOverlay").classList.remove("open");
   $("flowSave").onclick = saveFlow;
+  $("docMoreBtn").onclick = openDocModal;
+  $("docModalClose").onclick = () => $("docOverlay").classList.remove("open");
+  $("docOverlay").onclick = (e) => { if (e.target.id === "docOverlay") $("docOverlay").classList.remove("open"); };
 
   await loadProjects();
 }
@@ -364,12 +369,45 @@ function renderAudit() {
 }
 
 async function loadDoc(ref) {
-  if (!ref) { $("docView").innerHTML = "<p class='faint'>(연결된 문서 없음)</p>"; $("docTitle").textContent = ""; return; }
+  const moreBtn = $("docMoreBtn");
+  if (!ref) {
+    $("docView").innerHTML = "<p class='faint'>(연결된 문서 없음)</p>";
+    $("docTitle").textContent = "";
+    DOC_FULL = ""; DOC_REF = "";
+    if (moreBtn) moreBtn.style.display = "none";
+    return;
+  }
   $("docTitle").textContent = "📄 " + ref;
   try {
     const d = await api("/api/doc?ref=" + encodeURIComponent(ref));
-    $("docView").innerHTML = mdToHtml(d.text || "(빈 문서)");
-  } catch (e) { $("docView").innerHTML = "<p class='faint'>(문서 로드 실패: " + escapeHtml(ref) + ")</p>"; }
+    DOC_FULL = d.text || "(빈 문서)"; DOC_REF = ref;
+    const short = shortMd(DOC_FULL);
+    const truncated = short.length < DOC_FULL.length;
+    $("docView").innerHTML = mdToHtml(short) + (truncated ? `<p class="faint" style="margin-top:8px">… (더보기로 전체 보기)</p>` : "");
+    if (moreBtn) moreBtn.style.display = truncated ? "" : "none";
+  } catch (e) {
+    $("docView").innerHTML = "<p class='faint'>(문서 로드 실패: " + escapeHtml(ref) + ")</p>";
+    if (moreBtn) moreBtn.style.display = "none";
+  }
+}
+
+// 문서 요약: 첫 섹션(2번째 heading 전) 또는 최대 14줄
+function shortMd(text) {
+  const lines = text.split(/\r?\n/);
+  const out = []; let headings = 0;
+  for (const ln of lines) {
+    if (/^#{1,6}\s/.test(ln)) { headings++; if (headings >= 2 && out.length > 0) break; }
+    out.push(ln);
+    if (out.length >= 14) break;
+  }
+  return out.join("\n").trim();
+}
+
+function openDocModal() {
+  if (!DOC_FULL) return;
+  $("docModalTitle").textContent = "📄 " + DOC_REF;
+  $("docModalBody").innerHTML = mdToHtml(DOC_FULL);
+  $("docOverlay").classList.add("open");
 }
 
 // 경량 마크다운 렌더러 (외부 의존성 없음)

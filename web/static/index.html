@@ -31,9 +31,12 @@
 
   <!-- 우: 문서·프롬프트 실시간 + 감사로그 -->
   <div class="pane right">
-    <h2>하네스 문서 · 실시간</h2>
-    <div id="docTitle" class="hint" style="margin-bottom:6px"></div>
-    <div id="docView" class="docview">단계를 선택하면 관련 문서가 여기 표시됩니다.</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <h2 style="margin:0">하네스 문서 · 실시간</h2>
+      <button id="docMoreBtn" class="btn small" style="display:none">더보기 ⤢</button>
+    </div>
+    <div id="docTitle" class="hint" style="margin:6px 0"></div>
+    <div id="docView" class="docview">단계를 선택하면 관련 문서 요약이 여기 표시됩니다.</div>
     <div class="audit">
       <h2 style="margin-top:16px">감사 로그</h2>
       <div id="auditLog"></div>
@@ -52,6 +55,17 @@
       <button class="btn small" id="flowCancel">취소</button>
       <button class="btn gate" id="flowSave">저장</button>
     </div>
+  </div>
+</div>
+
+<!-- 문서 전체보기 모달 -->
+<div class="overlay" id="docOverlay">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
+      <h3 id="docModalTitle" style="margin:0">문서</h3>
+      <button class="btn small" id="docModalClose">닫기 ✕</button>
+    </div>
+    <div id="docModalBody" class="docview" style="max-height:72vh"></div>
   </div>
 </div>
 

@@ -20,8 +20,9 @@ NAME_STAGE = {
     "python (py 포함)": "base", "uv": "base", "node": "base", "git": "base",
     "OPENAI_API_KEY": "image",
     "Blender (선택)": "mesh",
+    "CUDA / GPU (nvidia-smi)": "mesh",
     "Hunyuan3D-2 레포": "mesh", "venv (PyTorch)": "mesh",
-    "torch CUDA": "mesh", "★ Hunyuan 모델 다운로드": "mesh",
+    "torch CUDA (venv)": "mesh", "★ Hunyuan 모델 다운로드": "mesh",
     "Unreal Engine": "unreal", "unrealclaude MCP 등록": "unreal",
     "Unreal 에디터 실행중": "unreal", "REST :3000 (execute_script)": "unreal",
 }
@@ -62,9 +63,10 @@ def spec():
         {"name": "uv", "required": False, "need": "파이썬 패키지 관리 (선택)"},
         {"name": "OPENAI_API_KEY", "required": False, "need": "기본은 로컬 이미지 — gpt-image-1 엔진 고를 때만 필요"},
         {"name": "Blender (선택)", "required": False, "need": "블록아웃/레퍼런스 쓸 때만"},
+        {"name": "CUDA / GPU (nvidia-smi)", "required": True, "need": "3D 생성 GPU 가속 — NVIDIA 드라이버+CUDA"},
         {"name": "Hunyuan3D-2 레포", "required": False, "need": "이미지→3D 로컬 레포"},
         {"name": "venv (PyTorch)", "required": False, "need": "Hunyuan 실행 가상환경"},
-        {"name": "torch CUDA", "required": False, "need": "GPU 가속 (없으면 매우 느림)"},
+        {"name": "torch CUDA (venv)", "required": False, "need": "venv의 PyTorch가 GPU 인식하는지"},
         {"name": "★ Hunyuan 모델 다운로드", "required": True, "need": "3D 생성 가중치 (수 GB)"},
         {"name": "Unreal Engine", "required": False, "need": "UE_5.x — 임포트/배치/렌더"},
         {"name": "unrealclaude MCP 등록", "required": True, "need": "언리얼 직접 조종"},
@@ -132,6 +134,12 @@ def run(hunyuan_dir=None, env_file=None):
 
     # === C. 3D 생성 (독립 Hunyuan3D-2 로컬) ===
     C = "C. 3D (Hunyuan3D-2)"
+    # ★ CUDA/GPU 는 venv 유무와 무관하게 항상 확인 (nvidia-smi)
+    gpu = _run(["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"], timeout=8)
+    gpu_ok = bool(gpu) and "," in gpu and "not found" not in gpu.lower() and "error" not in gpu.lower()
+    add(C, "CUDA / GPU (nvidia-smi)", gpu_ok,
+        ("GPU: " + gpu) if gpu_ok else "nvidia-smi 미검출 — NVIDIA 드라이버+CUDA 설치 필요",
+        required=True)
     hd = hunyuan_dir or os.path.join(USER, "Desktop", "image3d", "Hunyuan3D-2")
     repo = os.path.isdir(hd)
     add(C, "Hunyuan3D-2 레포", repo, hd if repo else "없음 — git clone Tencent/Hunyuan3D-2")
@@ -141,8 +149,8 @@ def run(hunyuan_dir=None, env_file=None):
     add(C, "venv (PyTorch)", bool(venv_py), venv_py or "venv 없음 — Hunyuan용 가상환경 미생성")
     if venv_py:
         cu = _run([venv_py, "-c", "import torch;print('cuda' if torch.cuda.is_available() else 'cpu')"], timeout=25)
-        add(C, "torch CUDA", cu == "cuda",
-            "GPU 사용 가능" if cu == "cuda" else ((cu + " — GPU 인식 안 됨(느림)") if cu else "torch import 실패 — 확장 빌드 필요"))
+        add(C, "torch CUDA (venv)", cu == "cuda",
+            "venv PyTorch가 GPU 인식" if cu == "cuda" else ((cu + " — venv PyTorch가 GPU 인식 못함") if cu else "torch import 실패 — 확장 빌드 필요"))
     hf = os.path.join(USER, ".cache", "huggingface", "hub", "models--tencent--Hunyuan3D-2")
     hy = os.path.join(USER, ".cache", "hy3dgen")
     md = os.path.isdir(hf) or os.path.isdir(hy)
