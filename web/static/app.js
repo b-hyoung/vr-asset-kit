@@ -265,45 +265,62 @@ async function loadDiagSpec() {
 }
 
 function renderDiagSpec(items) {
-  const cats = {};
-  items.forEach((i) => { (cats[i.category] = cats[i.category] || []).push(i); });
-  let h = `<div class="hint" style="margin-bottom:2px">체크리스트 (진단 전 · <span style="color:var(--faint)">미확인 ⬚</span>)</div>`;
-  for (const c of Object.keys(cats)) {
-    h += `<div style="margin-top:10px;font-size:11px;color:var(--faint);font-family:var(--mono)">${escapeHtml(c)}</div>`;
-    for (const i of cats[c]) {
-      h += `<div style="display:flex;gap:8px;padding:3px 0;font-size:12.5px;align-items:baseline">
-        <span style="color:var(--faint);width:16px;flex:none">⬚</span>
-        <span style="min-width:170px;flex:none">${escapeHtml(i.name)}${i.required ? ' <b style="color:var(--gate)">★</b>' : ''}</span>
-        <span class="faint" style="font-size:11.5px">${escapeHtml(i.need || '')}</span></div>`;
-    }
-  }
-  return h;
+  return specSummary(items) + buildDiagRows(items, true);
 }
 
 function paintDiag(d) {
   const stat = $("diagStatus"), res = $("diagResult");
   if (!stat || !res) return;
   const miss = d.required_missing || [];
-  stat.innerHTML = `진단 완료 · OK ${d.ok}/${d.total} · ` +
-    (miss.length
-      ? `<span style="color:var(--warn)">핵심 확인필요: ${escapeHtml(miss.join(", "))}</span>`
-      : `<span style="color:var(--good)">핵심 준비됨 ✅</span>`);
-  res.innerHTML = renderDiagItems(d.items || []);
+  stat.innerHTML = miss.length
+    ? `<span style="color:var(--warn)">핵심 확인필요: ${escapeHtml(miss.join(", "))}</span>`
+    : `<span style="color:var(--good)">핵심 준비됨 ✅ — 확정 가능</span>`;
+  res.innerHTML = diagSummary(d) + buildDiagRows(d.items || [], false);
 }
 
-function renderDiagItems(items) {
+function specSummary(items) {
+  const req = items.filter((i) => i.required).length;
+  return `<div class="diag-summary">
+    <div class="cell"><div class="lb">핵심 ★</div><div class="big" style="color:var(--gate)">${req}</div></div>
+    <div class="cell"><div class="lb">전체</div><div class="big">${items.length}</div></div>
+    <div class="diag-bar"><span style="width:0%"></span></div>
+    <div class="diag-note">미진단 — '진단 시작'을 누르세요</div>
+  </div>`;
+}
+
+function diagSummary(d) {
+  const items = d.items || [];
+  const req = items.filter((i) => i.required);
+  const reqOk = req.filter((i) => i.ok).length;
+  const allOk = items.filter((i) => i.ok).length;
+  const pct = items.length ? Math.round(allOk / items.length * 100) : 0;
+  const reqDone = reqOk === req.length;
+  return `<div class="diag-summary">
+    <div class="cell"><div class="lb">핵심 ★ 준비</div><div class="big" style="color:${reqDone ? 'var(--good)' : 'var(--bad)'}">${reqOk}/${req.length}</div></div>
+    <div class="cell"><div class="lb">전체 준비</div><div class="big">${allOk}/${items.length}</div></div>
+    <div class="diag-bar"><span style="width:${pct}%"></span></div>
+    <div class="diag-note">${reqDone ? '<span style="color:var(--good)">핵심 준비 완료 — 확정 가능</span>' : '핵심 항목을 채우세요'}</div>
+  </div>`;
+}
+
+function buildDiagRows(items, pending) {
   const cats = {};
   items.forEach((i) => { (cats[i.category] = cats[i.category] || []).push(i); });
   let h = "";
   for (const c of Object.keys(cats)) {
-    h += `<div style="margin-top:10px;font-size:11px;color:var(--faint);font-family:var(--mono)">${escapeHtml(c)}</div>`;
+    h += `<div class="diag-cat">${escapeHtml(c)}</div>`;
     for (const i of cats[c]) {
-      const icon = i.ok ? "✅" : (i.required ? "⛔" : "⚠");
-      const col = i.ok ? "var(--good)" : (i.required ? "var(--bad)" : "var(--warn)");
-      h += `<div style="display:flex;gap:8px;padding:3px 0;font-size:12.5px;align-items:baseline">
-        <span style="color:${col};width:16px;flex:none">${icon}</span>
-        <span style="min-width:170px;flex:none">${escapeHtml(i.name)}${i.required ? ' <b style="color:var(--gate)">★</b>' : ''}</span>
-        <span class="faint" style="font-size:11.5px">${escapeHtml(i.detail)}</span></div>`;
+      const st = pending ? "pending" : (i.ok ? "ok" : (i.required ? "req" : "warn"));
+      const icon = st === "ok" ? "✓" : st === "req" ? "✕" : st === "warn" ? "!" : "";
+      const detail = pending ? (i.need || "") : (i.detail || "");
+      const stepChip = i.step ? `<span class="badge gate" style="margin-left:0;margin-right:6px">${escapeHtml(i.step)}</span>` : "";
+      h += `<div class="diag-row ${st}">
+        <div class="box">${icon}</div>
+        <div class="grow">
+          <div class="nm">${escapeHtml(i.name)}${i.required ? '<span class="diag-star">★</span>' : ''}</div>
+          <div class="nd">${stepChip}${escapeHtml(detail)}</div>
+        </div>
+      </div>`;
     }
   }
   return h;

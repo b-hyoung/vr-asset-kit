@@ -3,8 +3,8 @@
   "roles": {
     "image": {
       "label": "이미지 생성",
-      "choices": ["gpt-image-1", "higgsfield", "sdxl-local"],
-      "default": "gpt-image-1"
+      "choices": ["로컬 이미지(SDXL/ComfyUI)", "gpt-image-1", "higgsfield"],
+      "default": "로컬 이미지(SDXL/ComfyUI)"
     },
     "mesh_3d": {
       "label": "이미지 → 3D",

@@ -77,6 +77,28 @@ code{font-family:var(--mono);font-size:12px;background:#0c0f13;border:1px solid 
 .audit .a{font-size:11px;color:var(--faint);font-family:var(--mono);padding:3px 0;border-bottom:1px solid var(--line)}
 .audit .a .tm{color:var(--accent)}
 
+/* 진단 체크리스트 */
+.diag-summary{display:flex;gap:18px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:12px;flex-wrap:wrap}
+.diag-summary .cell{text-align:center}
+.diag-summary .cell .lb{font-size:10.5px;color:var(--faint);font-family:var(--mono);letter-spacing:.5px}
+.diag-summary .cell .big{font-size:22px;font-weight:800;font-family:var(--mono);line-height:1.1}
+.diag-bar{flex:1;min-width:120px;height:10px;border-radius:6px;background:#0c0f13;border:1px solid var(--line);overflow:hidden}
+.diag-bar>span{display:block;height:100%;background:linear-gradient(90deg,var(--good),var(--accent));transition:width .5s ease}
+.diag-note{font-size:11px;color:var(--faint);font-family:var(--mono)}
+.diag-cat{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--accent);margin:14px 0 6px;font-family:var(--mono)}
+.diag-row{display:flex;gap:12px;align-items:center;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--panel);margin-bottom:6px;transition:border-color .2s,background .2s}
+.diag-row .box{width:26px;height:26px;flex:none;border-radius:7px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:var(--faint)}
+.diag-row .grow{flex:1;min-width:0}
+.diag-row .nm{font-size:13.5px;font-weight:600}
+.diag-row .nd{font-size:11.5px;color:var(--faint);margin-top:1px;overflow-wrap:anywhere}
+.diag-star{color:var(--gate);font-weight:800;margin-left:5px}
+.diag-row.ok .box{border-color:var(--good);color:var(--good);background:#132318}
+.diag-row.ok{border-color:#2b5a3d55}
+.diag-row.req .box{border-color:var(--bad);color:var(--bad);background:#241416}
+.diag-row.req{border-color:#5a2b2b;box-shadow:0 0 0 1px #5a2b2b33}
+.diag-row.warn .box{border-color:var(--warn);color:var(--warn);background:#241f14}
+.diag-row.pending{opacity:.75}
+
 /* flow editor overlay */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50}
 .overlay.open{display:flex}
