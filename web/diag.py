@@ -11,27 +11,46 @@ WEB = os.path.dirname(os.path.abspath(__file__))  # .../vr-harness/web
 
 # 파이프라인 순서(stage) — 이 순서대로 필요한 것을 묶어 보여준다.
 STAGES = [
-    {"key": "base",   "label": "기반 환경 (모든 단계 공통)"},
+    {"key": "base",   "label": "기반 환경 (초기 설치)"},
     {"key": "image",  "label": "① 이미지 생성 — STEP 2 앵커·이미지"},
     {"key": "mesh",   "label": "② 3D 생성 — STEP 4 에셋 제작"},
     {"key": "unreal", "label": "③ 언리얼 임포트·배치·렌더 — STEP 4.5~6"},
 ]
 # 항목 이름 → 어느 단계에서 필요한지
+# CUDA/venv 는 기반(초기 설치), Blender 는 분석·블록아웃용이라 기반의 선택 항목.
 NAME_STAGE = {
-    "python (py 포함)": "base", "uv": "base", "node": "base", "git": "base",
+    "python (py 포함)": "base", "node": "base", "git": "base", "uv": "base",
+    "CUDA / GPU (nvidia-smi)": "base", "venv (PyTorch)": "base",
+    "Blender (선택·분석)": "base",
     "FLUX.2 모델 (로컬)": "image", "OPENAI_API_KEY": "image",
-    "Blender (선택)": "mesh",
-    "CUDA / GPU (nvidia-smi)": "mesh",
-    "Hunyuan3D-2 레포": "mesh", "venv (PyTorch)": "mesh",
-    "torch CUDA (venv)": "mesh", "★ Hunyuan 모델 다운로드": "mesh",
+    "Hunyuan3D-2 준비 (레포+모델)": "mesh",
     "Unreal Engine": "unreal", "unrealclaude MCP 등록": "unreal",
     "Unreal 에디터 실행중": "unreal", "REST :3000 (execute_script)": "unreal",
 }
 
+# 미설치 항목 설치 가이드 (마크다운). 프론트에서 '설치' 버튼 → 모달로 표시.
+GUIDES = {
+    "python (py 포함)": "### Python 설치\n1. https://python.org 에서 3.11+ 설치\n2. 설치 시 **py 런처 포함**, **Add to PATH** 체크\n3. 확인: `py -3 --version`",
+    "node": "### Node.js 설치\n1. https://nodejs.org (LTS)\n2. 확인: `node --version`\n\nMCP 브릿지 구동에 필요.",
+    "git": "### Git 설치\n1. https://git-scm.com/download/win\n2. 확인: `git --version`",
+    "uv": "### uv 설치 (선택)\n```\npip install uv\n```\n파이썬 패키지 관리 가속용.",
+    "CUDA / GPU (nvidia-smi)": "### CUDA / GPU 준비\n1. **NVIDIA 드라이버** 최신: https://www.nvidia.com/Download/index.aspx\n2. **CUDA Toolkit** (PyTorch에 맞는 12.x): https://developer.nvidia.com/cuda-downloads\n3. 확인: `nvidia-smi`\n\n로컬 이미지(FLUX)·3D(Hunyuan) 모두 GPU 가속에 필요.",
+    "venv (PyTorch)": "### venv + PyTorch(GPU)\n```\npy -3 -m venv venv\nvenv\\Scripts\\activate\npip install torch --index-url https://download.pytorch.org/whl/cu121\n```\n확인: `python -c \"import torch;print(torch.cuda.is_available())\"` → True",
+    "Blender (선택·분석)": "### Blender (선택 — 분석/블록아웃용)\n1. https://www.blender.org/download/\n\n※ 3D 생성은 Hunyuan이 담당. Blender는 레퍼런스·블록아웃·검수 용도.",
+    "FLUX.2 모델 (로컬)": "### FLUX.2 [dev] 모델 받기\n```\npip install -U diffusers transformers accelerate\nhf download black-forest-labs/FLUX.2-dev\n```\n또는 첫 실행 시 자동 다운로드(HF 캐시). 16GB VRAM은 fp8 권장.",
+    "OPENAI_API_KEY": "### OpenAI 키 (gpt-image 쓸 때만)\n1. https://platform.openai.com/api-keys 에서 키 발급\n2. 이 화면 **엔진 선택에서 gpt-image → 키 입력 → 저장** 하면 `.env`에 저장됩니다.",
+    "Hunyuan3D-2 준비 (레포+모델)": "### Hunyuan3D-2 (로컬 3D)\n```\ngit clone https://github.com/Tencent/Hunyuan3D-2\n```\n- venv에서 의존성 설치(레포 README)\n- 모델 가중치는 첫 실행 시 HF에서 자동 다운로드(수 GB)\n- 경로 지정: 환경변수 `HunyuanDir`",
+    "Unreal Engine": "### Unreal Engine\n1. Epic Games Launcher → UE 5.x 설치 (프로젝트 버전 고정)\n2. 확인: `C:\\Program Files\\Epic Games\\UE_5.x`",
+    "unrealclaude MCP 등록": "### UnrealClaude MCP 등록\n```\nclaude mcp add --scope user unrealclaude -- node <플러그인>\\Resources\\mcp-bridge\\index.js\n```\n`~/.claude.json` 에 등록됨.",
+    "Unreal 에디터 실행중": "### 언리얼 에디터 실행\n임포트/배치/렌더 단계 전에 프로젝트를 연다. (이미지·3D 단계는 없어도 됨)",
+    "REST :3000 (execute_script)": "### REST :3000 열기\n언리얼 에디터 + UnrealClaude 플러그인이 켜지면 :3000 이 열린다. 에디터를 먼저 실행.",
+}
 
-def _attach_stage(items):
+
+def _attach_meta(items):
     for it in items:
         it["stage"] = NAME_STAGE.get(it["name"], "base")
+        it["guide"] = GUIDES.get(it["name"], "")
     return items
 
 
@@ -59,23 +78,21 @@ def spec():
     run() 이 채우는 항목 이름과 1:1로 맞춘다."""
     items = [
         {"name": "python (py 포함)", "required": True, "need": "모든 스크립트 실행"},
+        {"name": "CUDA / GPU (nvidia-smi)", "required": True, "need": "이미지·3D GPU 가속 — NVIDIA 드라이버+CUDA"},
+        {"name": "venv (PyTorch)", "required": False, "need": "GPU 파이썬 환경 (torch)"},
         {"name": "node", "required": False, "need": "MCP 브릿지 실행"},
         {"name": "git", "required": False, "need": "버전관리 (선택)"},
         {"name": "uv", "required": False, "need": "파이썬 패키지 관리 (선택)"},
-        {"name": "FLUX.2 모델 (로컬)", "required": False, "need": "기본 이미지 엔진 — FLUX.2 [dev] diffusers (HF 캐시). 서버 불필요"},
-        {"name": "OPENAI_API_KEY", "required": False, "need": "대안 — gpt-image-1 엔진 고를 때만 필요"},
-        {"name": "Blender (선택)", "required": False, "need": "블록아웃/레퍼런스 쓸 때만"},
-        {"name": "CUDA / GPU (nvidia-smi)", "required": True, "need": "3D 생성 GPU 가속 — NVIDIA 드라이버+CUDA"},
-        {"name": "Hunyuan3D-2 레포", "required": False, "need": "이미지→3D 로컬 레포"},
-        {"name": "venv (PyTorch)", "required": False, "need": "Hunyuan 실행 가상환경"},
-        {"name": "torch CUDA (venv)", "required": False, "need": "venv의 PyTorch가 GPU 인식하는지"},
-        {"name": "★ Hunyuan 모델 다운로드", "required": True, "need": "3D 생성 가중치 (수 GB)"},
+        {"name": "Blender (선택·분석)", "required": False, "need": "분석·블록아웃·검수용 (생성 아님)"},
+        {"name": "FLUX.2 모델 (로컬)", "required": False, "need": "기본 이미지 엔진 — FLUX.2 [dev] diffusers (HF 캐시)"},
+        {"name": "OPENAI_API_KEY", "required": False, "need": "대안 — gpt-image-1 엔진 고를 때만"},
+        {"name": "Hunyuan3D-2 준비 (레포+모델)", "required": True, "need": "로컬 3D 생성 — 레포+가중치"},
         {"name": "Unreal Engine", "required": False, "need": "UE_5.x — 임포트/배치/렌더"},
         {"name": "unrealclaude MCP 등록", "required": True, "need": "언리얼 직접 조종"},
         {"name": "Unreal 에디터 실행중", "required": False, "need": "임포트 단계 전에 열 것"},
         {"name": "REST :3000 (execute_script)", "required": False, "need": "에디터+플러그인 서버"},
     ]
-    return {"stages": STAGES, "items": _attach_stage(items)}
+    return {"stages": STAGES, "items": _attach_meta(items)}
 
 
 def run(hunyuan_dir=None, env_file=None):
@@ -103,10 +120,10 @@ def run(hunyuan_dir=None, env_file=None):
 
     try:
         bl = glob.glob(r"C:\Program Files\Blender Foundation\*")
-        add(A, "Blender (선택)", len(bl) > 0,
-            (", ".join(os.path.basename(x) for x in bl)) if bl else "블록아웃-레퍼런스 쓸 때만 필요")
+        add(A, "Blender (선택·분석)", len(bl) > 0,
+            (", ".join(os.path.basename(x) for x in bl) + " · 분석/블록아웃용") if bl else "선택 — 분석·블록아웃·검수 쓸 때만 (3D 생성은 Hunyuan)")
     except Exception:
-        add(A, "Blender (선택)", False, "확인 실패")
+        add(A, "Blender (선택·분석)", False, "확인 실패")
 
     # === B. 이미지 생성 (기본 로컬, gpt-image 선택 시 OpenAI 키) ===
     B = "B. 이미지 생성"
@@ -146,31 +163,41 @@ def run(hunyuan_dir=None, env_file=None):
         ("있음 @ " + key_where + " (값 숨김)") if key_found else "없음 — 기본은 로컬 이미지라 필수 아님. gpt-image 쓸 때만 .env에 설정",
         required=False)
 
-    # === C. 3D 생성 (독립 Hunyuan3D-2 로컬) ===
-    C = "C. 3D (Hunyuan3D-2)"
-    # ★ CUDA/GPU 는 venv 유무와 무관하게 항상 확인 (nvidia-smi)
+    # === CUDA/GPU (기반) ===
     gpu = _run(["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader"], timeout=8)
     gpu_ok = bool(gpu) and "," in gpu and "not found" not in gpu.lower() and "error" not in gpu.lower()
-    add(C, "CUDA / GPU (nvidia-smi)", gpu_ok,
+    add("", "CUDA / GPU (nvidia-smi)", gpu_ok,
         ("GPU: " + gpu) if gpu_ok else "nvidia-smi 미검출 — NVIDIA 드라이버+CUDA 설치 필요",
         required=True)
+
+    # === venv (PyTorch) (기반) — venv 존재 + torch GPU 인식 통합 ===
     hd = hunyuan_dir or os.path.join(USER, "Desktop", "image3d", "Hunyuan3D-2")
-    repo = os.path.isdir(hd)
-    add(C, "Hunyuan3D-2 레포", repo, hd if repo else "없음 — git clone Tencent/Hunyuan3D-2")
     venv_cands = [os.path.join(hd, "..", "venv", "Scripts", "python.exe"),
-                  os.path.join(hd, "venv", "Scripts", "python.exe")]
+                  os.path.join(hd, "venv", "Scripts", "python.exe"),
+                  os.path.join(USER, "Desktop", "image3d", "venv", "Scripts", "python.exe")]
     venv_py = next((c for c in venv_cands if os.path.isfile(c)), None)
-    add(C, "venv (PyTorch)", bool(venv_py), venv_py or "venv 없음 — Hunyuan용 가상환경 미생성")
     if venv_py:
         cu = _run([venv_py, "-c", "import torch;print('cuda' if torch.cuda.is_available() else 'cpu')"], timeout=25)
-        add(C, "torch CUDA (venv)", cu == "cuda",
-            "venv PyTorch가 GPU 인식" if cu == "cuda" else ((cu + " — venv PyTorch가 GPU 인식 못함") if cu else "torch import 실패 — 확장 빌드 필요"))
+        add("", "venv (PyTorch)", cu == "cuda",
+            "GPU 인식 OK" if cu == "cuda" else ((cu + " — venv 있으나 GPU 인식 못함") if cu else "venv 있으나 torch import 실패"))
+    else:
+        add("", "venv (PyTorch)", False, "venv 없음 — GPU 파이썬 환경 미생성")
+
+    # === ② 3D 생성: Hunyuan3D-2 준비 (레포+모델 통합) ===
+    repo = os.path.isdir(hd)
     hf = os.path.join(USER, ".cache", "huggingface", "hub", "models--tencent--Hunyuan3D-2")
     hy = os.path.join(USER, ".cache", "hy3dgen")
-    md = os.path.isdir(hf) or os.path.isdir(hy)
-    add(C, "★ Hunyuan 모델 다운로드", md,
-        "가중치 캐시 있음" if md else "아직 안 받음 — 첫 실행 시 HF에서 수 GB 자동 다운로드",
-        required=True)
+    model = os.path.isdir(hf) or os.path.isdir(hy)
+    both = repo and model
+    if both:
+        detail = "레포+모델 준비됨"
+    elif repo and not model:
+        detail = "레포 있음 · 모델 미다운로드(첫 실행 시 받음)"
+    elif model and not repo:
+        detail = "모델 캐시 있음 · 레포 없음 — git clone 필요"
+    else:
+        detail = "레포·모델 모두 없음 — git clone + 모델 다운로드"
+    add("", "Hunyuan3D-2 준비 (레포+모델)", both, detail, required=True)
 
     # === D. 언리얼 조종 (UnrealClaude MCP) ===
     D = "D. 언리얼 (UnrealClaude MCP)"
@@ -200,7 +227,7 @@ def run(hunyuan_dir=None, env_file=None):
     add(D, "REST :3000 (execute_script)", p3,
         "열림 (플러그인 서버 응답)" if p3 else "닫힘 — 에디터+플러그인 켜야 열림")
 
-    _attach_stage(items)  # 파이프라인 단계(stage) 부착
+    _attach_meta(items)  # 파이프라인 단계(stage) + 설치 가이드(guide) 부착
 
     total = len(items)
     ok = sum(1 for i in items if i["ok"])

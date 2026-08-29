@@ -309,6 +309,7 @@ function diagSummary(d) {
 }
 
 function buildDiagStages(data, pending) {
+  window._diagData = data;   // openGuide 가 참조
   const stages = data.stages || [];
   const items = data.items || [];
   const byStage = {};
@@ -330,7 +331,8 @@ function buildDiagStages(data, pending) {
       const st = pending ? "pending" : (i.ok ? "ok" : (i.required ? "req" : "warn"));
       const icon = st === "ok" ? "✓" : st === "req" ? "✕" : st === "warn" ? "!" : "";
       const detail = pending ? (i.need || "") : (i.detail || "");
-      h += `<div class="diag-row ${st}" title="${escapeAttr(detail)}"><div class="box">${icon}</div><div class="grow"><div class="nm">${escapeHtml(i.name)}${i.required ? '<span class="diag-star">★</span>' : ''}</div><div class="nd">${escapeHtml(detail)}</div></div></div>`;
+      const guideBtn = (!pending && !i.ok && i.guide) ? `<button class="btn small guide-btn" onclick="openGuide('${escapeAttr(i.name)}')">설치</button>` : "";
+      h += `<div class="diag-row ${st}" title="${escapeAttr(detail)}"><div class="box">${icon}</div><div class="grow"><div class="nm">${escapeHtml(i.name)}${i.required ? '<span class="diag-star">★</span>' : ''}</div><div class="nd">${escapeHtml(detail)}</div></div>${guideBtn}</div>`;
     }
     if (s.key === "image" && !pending) h += imageChooser();  // 진단 후: 엔진 하나 확정
     return h + `</div>`;
@@ -458,6 +460,15 @@ function shortMd(text) {
   }
   return out.join("\n").trim();
 }
+
+window.openGuide = (name) => {
+  const data = window._diagData || {};
+  const item = (data.items || []).find((i) => i.name === name);
+  const g = (item && item.guide) ? item.guide : "설치 가이드가 없습니다.";
+  $("docModalTitle").textContent = "🛠 설치 가이드 — " + name;
+  $("docModalBody").innerHTML = mdToHtml(g);
+  $("docOverlay").classList.add("open");
+};
 
 function openDocModal() {
   if (!DOC_FULL) return;
