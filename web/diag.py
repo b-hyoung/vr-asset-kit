@@ -11,10 +11,18 @@ WEB = os.path.dirname(os.path.abspath(__file__))  # .../vr-harness/web
 
 # 파이프라인 순서(stage) — 이 순서대로 필요한 것을 묶어 보여준다.
 STAGES = [
-    {"key": "base",   "label": "기반 환경 (초기 설치)"},
-    {"key": "image",  "label": "① 이미지 생성 — STEP 2 앵커·이미지"},
-    {"key": "mesh",   "label": "② 3D 생성 — STEP 4 에셋 제작"},
-    {"key": "unreal", "label": "③ 언리얼 임포트·배치·렌더 — STEP 4.5~6"},
+    {"key": "base",   "label": "기반 환경",
+     "action": "기반환경 설치 확인",
+     "todo": "빠진 게 있으면 '설치'를 눌러 가이드대로. 이미 다 OK면 그냥 통과."},
+    {"key": "image",  "label": "① 이미지 생성",
+     "action": "이미지 엔진 선택",
+     "todo": "FLUX(로컬) 또는 gpt-image 중 하나를 눌러 확정. 클라우드면 키 입력."},
+    {"key": "mesh",   "label": "② 3D 생성",
+     "action": "3D 엔진 선택",
+     "todo": "Hunyuan(로컬) 또는 Rodin(클라우드) 중 하나를 눌러 확정. 클라우드면 키 입력."},
+    {"key": "unreal", "label": "③ 언리얼",
+     "action": "언리얼 연결 확인",
+     "todo": "임포트·배치 단계에서 필요. 지금은 상태 확인만(에디터는 나중에 켜도 됨)."},
 ]
 # 항목 이름 → 어느 단계에서 필요한지
 # CUDA/venv 는 기반(초기 설치), Blender 는 분석·블록아웃용이라 기반의 선택 항목.

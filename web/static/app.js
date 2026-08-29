@@ -285,7 +285,8 @@ async function loadExampleBody() {
 // ---------- 진단 (환경·도구 체크) ----------
 function renderDiagnosticBlock() {
   let h = `<div style="margin-top:6px">
-    <div class="hint" style="margin-bottom:8px">아래는 <b>필요 환경/도구 체크리스트</b>입니다. <b style="color:var(--gate)">★</b> = 핵심 필수(OpenAI 키·Hunyuan 모델·UnrealClaude MCP). <b>진단 시작</b>을 누르면 각 항목을 실제로 점검합니다.</div>
+    ${envFlowLine()}
+    <div class="hint" style="margin:8px 0">아래 <b>1~4단계</b>를 위에서 아래로 확인/선택하면 됩니다. <b>진단 시작</b>으로 상태를 점검하세요.</div>
     <button class="btn small" id="diagBtn" onclick="runDiagnose()">진단 시작</button>
     <span id="diagStatus" class="hint" style="margin-left:8px"></span>
     <div id="diagResult" style="margin-top:10px"></div>
@@ -293,6 +294,19 @@ function renderDiagnosticBlock() {
   // 진입 즉시: 이미 진단했으면 결과, 아니면 체크리스트(미확인)를 먼저 리스트업
   setTimeout(() => { if (DIAG) paintDiag(DIAG); else loadDiagSpec(); }, 0);
   return h;
+}
+
+// 이 화면에서 유저가 할 순서 (user flow)를 한 줄로 그림
+function envFlowLine() {
+  const steps = [
+    { t: "진단", done: DIAG_DONE },
+    { t: "이미지 엔진", done: imageEngineReady() },
+    { t: "3D 엔진", done: meshEngineReady() },
+    { t: "확정", done: false },
+  ];
+  return `<div class="env-flow">` + steps.map((s, i) =>
+    `<span class="ef ${s.done ? "done" : ""}">${s.done ? "✓" : (i + 1)} ${s.t}</span>`
+  ).join(`<span class="ef-sep">→</span>`) + `</div>`;
 }
 
 async function loadDiagSpec() {
@@ -366,7 +380,10 @@ function buildDiagStages(data, pending) {
       badge = `<span class="stage-count ${reqMiss ? "bad" : (ok === rel.length ? "good" : "")}">${ok}/${rel.length}</span>`;
       cardCls = reqMiss ? "stage-bad" : (ok === rel.length ? "stage-good" : "");
     }
-    let h = `<div class="diag-stage ${cardCls}"><div class="stage-order">${oi + 1}</div><div class="diag-stage-h">${escapeHtml(s.label)} ${badge}</div>`;
+    const stepTitle = s.action || s.label;
+    let h = `<div class="diag-stage ${cardCls}">`
+      + `<div class="diag-stage-h"><span class="stage-step">${oi + 1}단계</span> ${escapeHtml(stepTitle)} ${badge}</div>`
+      + (s.todo ? `<div class="stage-todo">할 일 · ${escapeHtml(s.todo)}</div>` : "");
     for (const i of list) {
       const rel = pending ? true : itemRelevant(i.dep);
       const st = pending ? "pending" : (!rel ? "irrelevant" : (i.ok ? "ok" : (i.required ? "req" : "warn")));
