@@ -20,7 +20,7 @@ STAGES = [
 # CUDA/venv 는 기반(초기 설치), Blender 는 분석·블록아웃용이라 기반의 선택 항목.
 NAME_STAGE = {
     "python (py 포함)": "base", "node": "base", "git": "base", "uv": "base",
-    "CUDA / GPU (nvidia-smi)": "base", "venv (PyTorch)": "base",
+    "CUDA / GPU (nvidia-smi)": "base", "PyTorch (GPU)": "base",
     "Blender (선택·분석)": "base",
     "FLUX.2 모델 (로컬)": "image", "OPENAI_API_KEY": "image",
     "Hunyuan3D-2 준비 (레포+모델)": "mesh",
@@ -35,7 +35,7 @@ GUIDES = {
     "git": "### Git 설치\n1. https://git-scm.com/download/win\n2. 확인: `git --version`",
     "uv": "### uv 설치 (선택)\n```\npip install uv\n```\n파이썬 패키지 관리 가속용.",
     "CUDA / GPU (nvidia-smi)": "### CUDA / GPU 준비\n1. **NVIDIA 드라이버** 최신: https://www.nvidia.com/Download/index.aspx\n2. **CUDA Toolkit** (PyTorch에 맞는 12.x): https://developer.nvidia.com/cuda-downloads\n3. 확인: `nvidia-smi`\n\n로컬 이미지(FLUX)·3D(Hunyuan) 모두 GPU 가속에 필요.",
-    "venv (PyTorch)": "### venv + PyTorch(GPU)\n```\npy -3 -m venv venv\nvenv\\Scripts\\activate\npip install torch --index-url https://download.pytorch.org/whl/cu121\n```\n확인: `python -c \"import torch;print(torch.cuda.is_available())\"` → True",
+    "PyTorch (GPU)": "### PyTorch (GPU)  — 로컬 FLUX/Hunyuan 돌릴 때만\n**지금 gpt-image만 쓰고 3D는 나중이면 미뤄도 됩니다.**\n\n메인 파이썬에 바로 설치해도 되고(간단), venv로 격리해도 됩니다.\n```\npip install torch --index-url https://download.pytorch.org/whl/cu121\n```\n격리하려면(권장):\n```\npy -3 -m venv venv && venv\\Scripts\\activate\npip install torch --index-url https://download.pytorch.org/whl/cu121\n```\n확인: `python -c \"import torch;print(torch.cuda.is_available())\"` → True",
     "Blender (선택·분석)": "### Blender (선택 — 분석/블록아웃용)\n1. https://www.blender.org/download/\n\n※ 3D 생성은 Hunyuan이 담당. Blender는 레퍼런스·블록아웃·검수 용도.",
     "FLUX.2 모델 (로컬)": "### FLUX.2 [dev] 모델 받기\n```\npip install -U diffusers transformers accelerate\nhf download black-forest-labs/FLUX.2-dev\n```\n또는 첫 실행 시 자동 다운로드(HF 캐시). 16GB VRAM은 fp8 권장.",
     "OPENAI_API_KEY": "### OpenAI 키 (gpt-image 쓸 때만)\n1. https://platform.openai.com/api-keys 에서 키 발급\n2. 이 화면 **엔진 선택에서 gpt-image → 키 입력 → 저장** 하면 `.env`에 저장됩니다.",
@@ -79,7 +79,7 @@ def spec():
     items = [
         {"name": "python (py 포함)", "required": True, "need": "모든 스크립트 실행"},
         {"name": "CUDA / GPU (nvidia-smi)", "required": True, "need": "이미지·3D GPU 가속 — NVIDIA 드라이버+CUDA"},
-        {"name": "venv (PyTorch)", "required": False, "need": "GPU 파이썬 환경 (torch)"},
+        {"name": "PyTorch (GPU)", "required": False, "need": "로컬 FLUX/Hunyuan 돌릴 때 필요 · 지금은 미뤄도 됨"},
         {"name": "node", "required": False, "need": "MCP 브릿지 실행"},
         {"name": "git", "required": False, "need": "버전관리 (선택)"},
         {"name": "uv", "required": False, "need": "파이썬 패키지 관리 (선택)"},
@@ -170,18 +170,30 @@ def run(hunyuan_dir=None, env_file=None):
         ("GPU: " + gpu) if gpu_ok else "nvidia-smi 미검출 — NVIDIA 드라이버+CUDA 설치 필요",
         required=True)
 
-    # === venv (PyTorch) (기반) — venv 존재 + torch GPU 인식 통합 ===
+    # === PyTorch (GPU) (기반) — 메인 파이썬 우선, 없으면 venv 후보. 특정 venv 강요 X ===
     hd = hunyuan_dir or os.path.join(USER, "Desktop", "image3d", "Hunyuan3D-2")
-    venv_cands = [os.path.join(hd, "..", "venv", "Scripts", "python.exe"),
+    _code = "import torch;print('cuda' if torch.cuda.is_available() else 'cpu')"
+    res, where = None, ""
+    for cmd, lab in [(["python", "-c", _code], "python"), (["py", "-3", "-c", _code], "py")]:
+        r = _run(cmd, timeout=30)
+        if r in ("cuda", "cpu"):
+            res, where = r, lab
+            break
+    if res is None:  # 메인에 없으면 venv 후보 탐색
+        for c in [os.path.join(hd, "..", "venv", "Scripts", "python.exe"),
                   os.path.join(hd, "venv", "Scripts", "python.exe"),
-                  os.path.join(USER, "Desktop", "image3d", "venv", "Scripts", "python.exe")]
-    venv_py = next((c for c in venv_cands if os.path.isfile(c)), None)
-    if venv_py:
-        cu = _run([venv_py, "-c", "import torch;print('cuda' if torch.cuda.is_available() else 'cpu')"], timeout=25)
-        add("", "venv (PyTorch)", cu == "cuda",
-            "GPU 인식 OK" if cu == "cuda" else ((cu + " — venv 있으나 GPU 인식 못함") if cu else "venv 있으나 torch import 실패"))
+                  os.path.join(USER, "Desktop", "image3d", "venv", "Scripts", "python.exe")]:
+            if os.path.isfile(c):
+                r = _run([c, "-c", _code], timeout=30)
+                if r in ("cuda", "cpu"):
+                    res, where = r, "venv"
+                    break
+    if res == "cuda":
+        add("", "PyTorch (GPU)", True, "GPU 인식 OK (%s)" % where)
+    elif res == "cpu":
+        add("", "PyTorch (GPU)", False, "torch 있으나 GPU 인식 못함 (%s) — CUDA 빌드 확인" % where)
     else:
-        add("", "venv (PyTorch)", False, "venv 없음 — GPU 파이썬 환경 미생성")
+        add("", "PyTorch (GPU)", False, "미설치 — 로컬 FLUX/Hunyuan 돌릴 때만 필요(지금은 미뤄도 됨)")
 
     # === ② 3D 생성: Hunyuan3D-2 준비 (레포+모델 통합) ===
     repo = os.path.isdir(hd)
