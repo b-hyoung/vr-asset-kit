@@ -1,7 +1,7 @@
 :root{
   --bg:#0f1216; --panel:#171b22; --panel2:#1e2530; --line:#2a323f;
-  --ink:#e7ecf3; --dim:#9aa7b8; --faint:#6b7787;
-  --accent:#5ec8ff; --good:#57d38c; --warn:#ffb454; --bad:#ff6b6b; --gate:#c792ea;
+  --ink:#e7ecf3; --dim:#9aa7b8; --faint:#7d8a9c;
+  --accent:#5ec8ff; --good:#57d38c; --warn:#ffb454; --bad:#ff6b6b; --gate:#8fb6e6;
   --mono:"Cascadia Code",Consolas,"D2Coding",monospace;
   --sans:"Pretendard","Malgun Gothic","Segoe UI",system-ui,sans-serif;
 }
@@ -136,18 +136,18 @@ code{font-family:var(--mono);font-size:12px;background:#0c0f13;border:1px solid 
 .stage-count.good{color:var(--good);border-color:#2b5a3d;background:#132318}
 .stage-count.bad{color:var(--bad);border-color:#5a2b2b;background:#241416}
 .stage-arrow{text-align:center;color:var(--faint);font-size:12px;margin:2px 0}
-.diag-row{display:flex;gap:12px;align-items:center;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--panel);margin-bottom:6px;transition:border-color .2s,background .2s}
+.diag-row{display:flex;gap:10px;align-items:center;padding:6px 2px}
+.diag-row+.diag-row{border-top:1px solid rgba(255,255,255,.045)}
 .diag-row .box{width:26px;height:26px;flex:none;border-radius:7px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:var(--faint)}
 .diag-row .grow{flex:1;min-width:0}
 .diag-row .nm{font-size:13.5px;font-weight:600}
 .diag-row .nd{font-size:11.5px;color:var(--faint);margin-top:1px;overflow-wrap:anywhere}
 .diag-star{color:var(--gate);font-weight:800;margin-left:5px}
 .diag-row.ok .box{border-color:var(--good);color:var(--good);background:#132318}
-.diag-row.ok{border-color:#2b5a3d55}
 .diag-row.req .box{border-color:var(--bad);color:var(--bad);background:#241416}
-.diag-row.req{border-color:#5a2b2b;box-shadow:0 0 0 1px #5a2b2b33}
+.diag-row.req .nm{color:#ff9c9c}
 .diag-row.warn .box{border-color:var(--warn);color:var(--warn);background:#241f14}
-.diag-row.pending{opacity:.75}
+.diag-row.pending{opacity:.72}
 
 /* flow editor overlay */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50}
