@@ -258,14 +258,14 @@ async function loadDiagSpec() {
   res.innerHTML = `<div class="hint">체크리스트 불러오는 중…</div>`;
   try {
     const s = await api("/api/diagnose/spec");
-    res.innerHTML = renderDiagSpec(s.items || []);
+    res.innerHTML = renderDiagSpec(s);
   } catch (e) {
     res.innerHTML = `<div class="hint" style="color:var(--bad)">체크리스트 로드 실패: ${e.message}</div>`;
   }
 }
 
-function renderDiagSpec(items) {
-  return specSummary(items) + buildDiagRows(items, true);
+function renderDiagSpec(data) {
+  return specSummary(data.items || []) + buildDiagStages(data, true);
 }
 
 function paintDiag(d) {
@@ -275,7 +275,7 @@ function paintDiag(d) {
   stat.innerHTML = miss.length
     ? `<span style="color:var(--warn)">핵심 확인필요: ${escapeHtml(miss.join(", "))}</span>`
     : `<span style="color:var(--good)">핵심 준비됨 ✅ — 확정 가능</span>`;
-  res.innerHTML = diagSummary(d) + buildDiagRows(d.items || [], false);
+  res.innerHTML = diagSummary(d) + buildDiagStages(d, false);
 }
 
 function specSummary(items) {
@@ -303,26 +303,39 @@ function diagSummary(d) {
   </div>`;
 }
 
-function buildDiagRows(items, pending) {
-  const cats = {};
-  items.forEach((i) => { (cats[i.category] = cats[i.category] || []).push(i); });
+function buildDiagStages(data, pending) {
+  const stages = data.stages || [];
+  const items = data.items || [];
+  const byStage = {};
+  items.forEach((i) => { (byStage[i.stage] = byStage[i.stage] || []).push(i); });
   let h = "";
-  for (const c of Object.keys(cats)) {
-    h += `<div class="diag-cat">${escapeHtml(c)}</div>`;
-    for (const i of cats[c]) {
+  stages.forEach((s, idx) => {
+    const list = byStage[s.key] || [];
+    if (!list.length) return;
+    let badge = "";
+    if (!pending) {
+      const ok = list.filter((i) => i.ok).length;
+      const reqMiss = list.some((i) => i.required && !i.ok);
+      const cls = reqMiss ? "bad" : (ok === list.length ? "good" : "");
+      badge = `<span class="stage-count ${cls}">${ok}/${list.length}</span>`;
+    }
+    // 단계 사이 화살표 (순서 강조)
+    if (idx > 0) h += `<div class="stage-arrow">▼</div>`;
+    h += `<div class="diag-stage"><div class="diag-stage-h">${escapeHtml(s.label)} ${badge}</div>`;
+    for (const i of list) {
       const st = pending ? "pending" : (i.ok ? "ok" : (i.required ? "req" : "warn"));
       const icon = st === "ok" ? "✓" : st === "req" ? "✕" : st === "warn" ? "!" : "";
       const detail = pending ? (i.need || "") : (i.detail || "");
-      const stepChip = i.step ? `<span class="badge gate" style="margin-left:0;margin-right:6px">${escapeHtml(i.step)}</span>` : "";
       h += `<div class="diag-row ${st}">
         <div class="box">${icon}</div>
         <div class="grow">
           <div class="nm">${escapeHtml(i.name)}${i.required ? '<span class="diag-star">★</span>' : ''}</div>
-          <div class="nd">${stepChip}${escapeHtml(detail)}</div>
+          <div class="nd">${escapeHtml(detail)}</div>
         </div>
       </div>`;
     }
-  }
+    h += `</div>`;
+  });
   return h;
 }
 

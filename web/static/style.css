@@ -86,6 +86,12 @@ code{font-family:var(--mono);font-size:12px;background:#0c0f13;border:1px solid 
 .diag-bar>span{display:block;height:100%;background:linear-gradient(90deg,var(--good),var(--accent));transition:width .5s ease}
 .diag-note{font-size:11px;color:var(--faint);font-family:var(--mono)}
 .diag-cat{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--accent);margin:14px 0 6px;font-family:var(--mono)}
+.diag-stage{border:1px solid var(--line);border-radius:11px;padding:10px 12px;background:#13171d}
+.diag-stage-h{font-size:12.5px;font-weight:700;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.stage-count{font-family:var(--mono);font-size:11px;font-weight:700;padding:1px 8px;border-radius:12px;border:1px solid var(--line);color:var(--dim)}
+.stage-count.good{color:var(--good);border-color:#2b5a3d;background:#132318}
+.stage-count.bad{color:var(--bad);border-color:#5a2b2b;background:#241416}
+.stage-arrow{text-align:center;color:var(--faint);font-size:12px;margin:2px 0}
 .diag-row{display:flex;gap:12px;align-items:center;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--panel);margin-bottom:6px;transition:border-color .2s,background .2s}
 .diag-row .box{width:26px;height:26px;flex:none;border-radius:7px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:var(--faint)}
 .diag-row .grow{flex:1;min-width:0}

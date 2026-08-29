@@ -8,6 +8,30 @@ import os, glob, json, shutil, subprocess, socket
 
 USER = os.path.expanduser("~")
 
+# 파이프라인 순서(stage) — 이 순서대로 필요한 것을 묶어 보여준다.
+STAGES = [
+    {"key": "base",   "label": "기반 환경 (모든 단계 공통)"},
+    {"key": "image",  "label": "① 이미지 생성 — STEP 2 앵커·이미지"},
+    {"key": "mesh",   "label": "② 3D 생성 — STEP 4 에셋 제작"},
+    {"key": "unreal", "label": "③ 언리얼 임포트·배치·렌더 — STEP 4.5~6"},
+]
+# 항목 이름 → 어느 단계에서 필요한지
+NAME_STAGE = {
+    "python (py 포함)": "base", "uv": "base", "node": "base", "git": "base",
+    "OPENAI_API_KEY": "image",
+    "Blender (선택)": "mesh",
+    "Hunyuan3D-2 레포": "mesh", "venv (PyTorch)": "mesh",
+    "torch CUDA": "mesh", "★ Hunyuan 모델 다운로드": "mesh",
+    "Unreal Engine": "unreal", "unrealclaude MCP 등록": "unreal",
+    "Unreal 에디터 실행중": "unreal", "REST :3000 (execute_script)": "unreal",
+}
+
+
+def _attach_stage(items):
+    for it in items:
+        it["stage"] = NAME_STAGE.get(it["name"], "base")
+    return items
+
 
 def _run(cmd, timeout=6):
     try:
@@ -31,22 +55,23 @@ def _port_open(port, host="127.0.0.1"):
 def spec():
     """진단 전에 먼저 보여줄 체크리스트 정의 (검사 실행 없이 빠르게).
     run() 이 채우는 항목 이름과 1:1로 맞춘다."""
-    return {"items": [
-        {"category": "A. 로컬 소프트웨어", "name": "Unreal Engine", "required": False, "step": "4.5 임포트~6 렌더", "need": "UE_5.x — 임포트/배치/렌더에 필요"},
-        {"category": "A. 로컬 소프트웨어", "name": "python (py 포함)", "required": True, "step": "전 단계", "need": "모든 스크립트 실행"},
-        {"category": "A. 로컬 소프트웨어", "name": "uv", "required": False, "step": "환경(선택)", "need": "파이썬 패키지 관리 (선택)"},
-        {"category": "A. 로컬 소프트웨어", "name": "node", "required": False, "step": "MCP 브릿지", "need": "MCP 브릿지 실행"},
-        {"category": "A. 로컬 소프트웨어", "name": "git", "required": False, "step": "환경(선택)", "need": "버전관리"},
-        {"category": "A. 로컬 소프트웨어", "name": "Blender (선택)", "required": False, "step": "4 에셋제작(선택)", "need": "블록아웃/레퍼런스 쓸 때만"},
-        {"category": "B. 이미지 생성", "name": "OPENAI_API_KEY", "required": False, "step": "2 앵커·4 제작 (gpt-image 선택 시만)", "need": "기본은 로컬 이미지. gpt-image-1 엔진 고를 때만 필요"},
-        {"category": "C. 3D (Hunyuan3D-2)", "name": "Hunyuan3D-2 레포", "required": False, "step": "4 에셋제작", "need": "이미지→3D 로컬 레포"},
-        {"category": "C. 3D (Hunyuan3D-2)", "name": "venv (PyTorch)", "required": False, "step": "4 에셋제작", "need": "Hunyuan 실행 가상환경"},
-        {"category": "C. 3D (Hunyuan3D-2)", "name": "torch CUDA", "required": False, "step": "4 에셋제작", "need": "GPU 가속 (없으면 느림)"},
-        {"category": "C. 3D (Hunyuan3D-2)", "name": "★ Hunyuan 모델 다운로드", "required": True, "step": "4 에셋제작", "need": "3D 생성 가중치 (수 GB)"},
-        {"category": "D. 언리얼 (UnrealClaude MCP)", "name": "unrealclaude MCP 등록", "required": True, "step": "4.5 임포트~5 배치", "need": "언리얼 직접 조종"},
-        {"category": "D. 언리얼 (UnrealClaude MCP)", "name": "Unreal 에디터 실행중", "required": False, "step": "4.5 임포트~6 렌더", "need": "임포트 단계 전에 열 것"},
-        {"category": "D. 언리얼 (UnrealClaude MCP)", "name": "REST :3000 (execute_script)", "required": False, "step": "4.5 임포트~6 렌더", "need": "에디터+플러그인 서버"},
-    ]}
+    items = [
+        {"name": "python (py 포함)", "required": True, "need": "모든 스크립트 실행"},
+        {"name": "node", "required": False, "need": "MCP 브릿지 실행"},
+        {"name": "git", "required": False, "need": "버전관리 (선택)"},
+        {"name": "uv", "required": False, "need": "파이썬 패키지 관리 (선택)"},
+        {"name": "OPENAI_API_KEY", "required": False, "need": "기본은 로컬 이미지 — gpt-image-1 엔진 고를 때만 필요"},
+        {"name": "Blender (선택)", "required": False, "need": "블록아웃/레퍼런스 쓸 때만"},
+        {"name": "Hunyuan3D-2 레포", "required": False, "need": "이미지→3D 로컬 레포"},
+        {"name": "venv (PyTorch)", "required": False, "need": "Hunyuan 실행 가상환경"},
+        {"name": "torch CUDA", "required": False, "need": "GPU 가속 (없으면 매우 느림)"},
+        {"name": "★ Hunyuan 모델 다운로드", "required": True, "need": "3D 생성 가중치 (수 GB)"},
+        {"name": "Unreal Engine", "required": False, "need": "UE_5.x — 임포트/배치/렌더"},
+        {"name": "unrealclaude MCP 등록", "required": True, "need": "언리얼 직접 조종"},
+        {"name": "Unreal 에디터 실행중", "required": False, "need": "임포트 단계 전에 열 것"},
+        {"name": "REST :3000 (execute_script)", "required": False, "need": "에디터+플러그인 서버"},
+    ]
+    return {"stages": STAGES, "items": _attach_stage(items)}
 
 
 def run(hunyuan_dir=None, env_file=None):
@@ -153,12 +178,10 @@ def run(hunyuan_dir=None, env_file=None):
     add(D, "REST :3000 (execute_script)", p3,
         "열림 (플러그인 서버 응답)" if p3 else "닫힘 — 에디터+플러그인 켜야 열림")
 
-    # 각 항목에 "어느 단계에서 필요한지"(step) 부착 — spec()과 이름으로 매칭
-    step_map = {i["name"]: i.get("step", "") for i in spec()["items"]}
-    for it in items:
-        it["step"] = step_map.get(it["name"], "")
+    _attach_stage(items)  # 파이프라인 단계(stage) 부착
 
     total = len(items)
     ok = sum(1 for i in items if i["ok"])
     required_missing = [i["name"] for i in items if i["required"] and not i["ok"]]
-    return {"items": items, "ok": ok, "total": total, "required_missing": required_missing}
+    return {"stages": STAGES, "items": items, "ok": ok, "total": total,
+            "required_missing": required_missing}
