@@ -25,6 +25,7 @@ NAME_STAGE = {
     "FLUX.2 모델 (로컬)": "image", "OPENAI_API_KEY": "image",
     "Hunyuan3D-2 준비 (레포+모델)": "mesh", "RODIN_API_KEY (Hyper3D)": "mesh",
     "Unreal Engine": "unreal", "unrealclaude MCP 등록": "unreal",
+    "Blender MCP 등록": "unreal",
     "Unreal 에디터 실행중": "unreal", "REST :3000 (execute_script)": "unreal",
 }
 
@@ -43,6 +44,7 @@ GUIDES = {
     "RODIN_API_KEY (Hyper3D)": "### Rodin / Hyper3D 키 (클라우드 3D 쓸 때만)\n1. Hyper3D/Rodin에서 API 키 발급\n2. 3D 엔진 선택에서 **Rodin/Hyper3D → 키 입력 → 저장** 하면 `.env`에 저장됩니다.\n\n※ 로컬 Hunyuan을 쓰면 이 키는 불필요.",
     "Unreal Engine": "### Unreal Engine\n1. Epic Games Launcher → UE 5.x 설치 (프로젝트 버전 고정)\n2. 확인: `C:\\Program Files\\Epic Games\\UE_5.x`",
     "unrealclaude MCP 등록": "### UnrealClaude MCP 등록\n```\nclaude mcp add --scope user unrealclaude -- node <플러그인>\\Resources\\mcp-bridge\\index.js\n```\n`~/.claude.json` 에 등록됨.",
+    "Blender MCP 등록": "### Blender MCP 등록 (선택 — 블록아웃/분석)\nBlender를 Claude로 조종해 블록아웃·레퍼런스·검수. **언리얼 임포트·배치 전** 편집 단계에서 사용.\n```\nclaude mcp add --scope user blender -- <blender-mcp 실행 명령>\n```\nBlender 쪽 addon(BlenderMCP)도 켜야 함. 로컬 3D를 Hunyuan만으로 하면 생략 가능.",
     "Unreal 에디터 실행중": "### 언리얼 에디터 실행\n임포트/배치/렌더 단계 전에 프로젝트를 연다. (이미지·3D 단계는 없어도 됨)",
     "REST :3000 (execute_script)": "### REST :3000 열기\n언리얼 에디터 + UnrealClaude 플러그인이 켜지면 :3000 이 열린다. 에디터를 먼저 실행.",
 }
@@ -62,6 +64,7 @@ DEP = {
     "FLUX.2 모델 (로컬)": "image:local", "OPENAI_API_KEY": "image:cloud",
     "Hunyuan3D-2 준비 (레포+모델)": "mesh:local", "RODIN_API_KEY (Hyper3D)": "mesh:cloud",
     "Unreal Engine": "always", "unrealclaude MCP 등록": "always",
+    "Blender MCP 등록": "always",
     "Unreal 에디터 실행중": "always", "REST :3000 (execute_script)": "always",
 }
 
@@ -110,6 +113,7 @@ def spec():
         {"name": "RODIN_API_KEY (Hyper3D)", "required": False, "need": "클라우드 3D(Rodin/Hyper3D) 쓸 때만"},
         {"name": "Unreal Engine", "required": False, "need": "UE_5.x — 임포트/배치/렌더"},
         {"name": "unrealclaude MCP 등록", "required": True, "need": "언리얼 직접 조종"},
+        {"name": "Blender MCP 등록", "required": False, "need": "블록아웃/분석 — 언리얼 임포트·배치 전 편집(선택)"},
         {"name": "Unreal 에디터 실행중", "required": False, "need": "임포트 단계 전에 열 것"},
         {"name": "REST :3000 (execute_script)", "required": False, "need": "에디터+플러그인 서버"},
     ]
@@ -257,6 +261,7 @@ def run(hunyuan_dir=None, env_file=None):
     D = "D. 언리얼 (UnrealClaude MCP)"
     cfg = os.path.join(USER, ".claude.json")
     has_unreal = False
+    has_blender = False
     try:
         if os.path.isfile(cfg):
             with open(cfg, encoding="utf-8", errors="ignore") as f:
@@ -266,11 +271,16 @@ def run(hunyuan_dir=None, env_file=None):
                 if isinstance(pv, dict):
                     names += list((pv.get("mcpServers") or {}).keys())
             has_unreal = any("unreal" in n.lower() for n in names)
+            has_blender = any("blender" in n.lower() for n in names)
     except Exception:
         pass
     add(D, "unrealclaude MCP 등록", has_unreal,
         ".claude.json에 등록됨" if has_unreal else "미등록 — claude mcp add --scope user unrealclaude ...",
         required=True)
+    # Blender MCP — 블록아웃/편집을 Claude로 조종 (언리얼 임포트·배치 전 단계). 선택.
+    add(D, "Blender MCP 등록", has_blender,
+        ".claude.json에 등록됨" if has_blender else "미등록 — Blender 블록아웃/분석 쓸 때만 (선택)",
+        required=False)
 
     up = _run(["tasklist", "/FI", "IMAGENAME eq UnrealEditor.exe", "/NH"], timeout=8)
     running = bool(up) and "UnrealEditor" in up
