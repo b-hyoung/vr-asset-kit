@@ -39,22 +39,105 @@ NAME_STAGE = {
 
 # 미설치 항목 설치 가이드 (마크다운). 프론트에서 '설치' 버튼 → 모달로 표시.
 GUIDES = {
-    "python (py 포함)": "### Python 설치\n1. https://python.org 에서 3.11+ 설치\n2. 설치 시 **py 런처 포함**, **Add to PATH** 체크\n3. 확인: `py -3 --version`",
-    "node": "### Node.js 설치\n1. https://nodejs.org (LTS)\n2. 확인: `node --version`\n\nMCP 브릿지 구동에 필요.",
-    "git": "### Git 설치\n1. https://git-scm.com/download/win\n2. 확인: `git --version`",
-    "uv": "### uv 설치 (선택)\n```\npip install uv\n```\n파이썬 패키지 관리 가속용.",
-    "CUDA / GPU (nvidia-smi)": "### CUDA / GPU 준비\n1. **NVIDIA 드라이버** 최신: https://www.nvidia.com/Download/index.aspx\n2. **CUDA Toolkit** (PyTorch에 맞는 12.x): https://developer.nvidia.com/cuda-downloads\n3. 확인: `nvidia-smi`\n\n로컬 이미지(FLUX)·3D(Hunyuan) 모두 GPU 가속에 필요.",
-    "PyTorch (GPU)": "### PyTorch (GPU)  — 로컬 FLUX/Hunyuan 돌릴 때만\n**지금 gpt-image만 쓰고 3D는 나중이면 미뤄도 됩니다.**\n\n메인 파이썬에 바로 설치해도 되고(간단), venv로 격리해도 됩니다.\n```\npip install torch --index-url https://download.pytorch.org/whl/cu121\n```\n격리하려면(권장):\n```\npy -3 -m venv venv && venv\\Scripts\\activate\npip install torch --index-url https://download.pytorch.org/whl/cu121\n```\n확인: `python -c \"import torch;print(torch.cuda.is_available())\"` → True",
-    "Blender (선택·분석)": "### Blender (선택 — 분석/블록아웃용)\n1. https://www.blender.org/download/\n\n※ 3D 생성은 Hunyuan이 담당. Blender는 레퍼런스·블록아웃·검수 용도.",
-    "FLUX.2 모델 (로컬)": "### FLUX.2 [dev] 모델 받기\n```\npip install -U diffusers transformers accelerate\nhf download black-forest-labs/FLUX.2-dev\n```\n또는 첫 실행 시 자동 다운로드(HF 캐시). 16GB VRAM은 fp8 권장.",
-    "OPENAI_API_KEY": "### OpenAI 키 (gpt-image 쓸 때만)\n1. https://platform.openai.com/api-keys 에서 키 발급\n2. 이 화면 **엔진 선택에서 gpt-image → 키 입력 → 저장** 하면 `.env`에 저장됩니다.",
-    "Hunyuan3D-2 준비 (레포+모델)": "### Hunyuan3D-2 (로컬 3D)\n```\ngit clone https://github.com/Tencent/Hunyuan3D-2\n```\n- venv에서 의존성 설치(레포 README)\n- 모델 가중치는 첫 실행 시 HF에서 자동 다운로드(수 GB)\n- 경로 지정: 환경변수 `HunyuanDir`",
-    "RODIN_API_KEY (Hyper3D)": "### Rodin / Hyper3D 키 (클라우드 3D 쓸 때만)\n1. Hyper3D/Rodin에서 API 키 발급\n2. 3D 엔진 선택에서 **Rodin/Hyper3D → 키 입력 → 저장** 하면 `.env`에 저장됩니다.\n\n※ 로컬 Hunyuan을 쓰면 이 키는 불필요.",
-    "Unreal Engine": "### Unreal Engine\n1. Epic Games Launcher → UE 5.x 설치 (프로젝트 버전 고정)\n2. 확인: `C:\\Program Files\\Epic Games\\UE_5.x`",
-    "unrealclaude MCP 등록": "### UnrealClaude MCP 등록\n```\nclaude mcp add --scope user unrealclaude -- node <플러그인>\\Resources\\mcp-bridge\\index.js\n```\n`~/.claude.json` 에 등록됨.",
-    "Blender MCP 등록": "### Blender MCP 등록 (선택 — 블록아웃/분석)\nBlender를 Claude로 조종해 블록아웃·레퍼런스·검수. **언리얼 임포트·배치 전** 편집 단계에서 사용.\n```\nclaude mcp add --scope user blender -- <blender-mcp 실행 명령>\n```\nBlender 쪽 addon(BlenderMCP)도 켜야 함. 로컬 3D를 Hunyuan만으로 하면 생략 가능.",
-    "Unreal 에디터 실행중": "### 언리얼 에디터 실행\n임포트/배치/렌더 단계 전에 프로젝트를 연다. (이미지·3D 단계는 없어도 됨)",
-    "REST :3000 (execute_script)": "### REST :3000 열기\n언리얼 에디터 + UnrealClaude 플러그인이 켜지면 :3000 이 열린다. 에디터를 먼저 실행.",
+    "python (py 포함)":
+        "## Python (py 런처 포함)\n"
+        "**설치**\n"
+        "1. https://python.org/downloads 에서 3.11+ 설치\n"
+        "2. 설치 첫 화면에서 **Add python.exe to PATH** 체크\n"
+        "3. 'Customize' → **py launcher** 포함(기본 체크)\n\n"
+        "**확인**\n"
+        "```\npy -3 --version\n```\n→ `Python 3.11.x` 나오면 성공. (안 나오면 재부팅 후 재시도)",
+    "node":
+        "## Node.js (MCP 브릿지 구동용)\n"
+        "**설치**\n1. https://nodejs.org 에서 **LTS** 설치 (기본값대로)\n\n"
+        "**확인**\n```\nnode --version\nnpm --version\n```\n→ `v20.x`(이상)·npm 버전 나오면 성공.",
+    "git":
+        "## Git\n**설치**\n1. https://git-scm.com/download/win (64-bit)\n2. 옵션 기본값으로 설치\n\n"
+        "**확인**\n```\ngit --version\n```\n→ `git version 2.x` 나오면 성공.",
+    "uv":
+        "## uv (선택 — 파이썬 패키지 가속)\n**설치** (택1)\n"
+        "```\npip install uv\n```\n또는\n```\npowershell -c \"irm https://astral.sh/uv/install.ps1 | iex\"\n```\n\n"
+        "**확인**\n```\nuv --version\n```",
+    "CUDA / GPU (nvidia-smi)":
+        "## CUDA / GPU (로컬 FLUX·Hunyuan 가속)\n"
+        "**설치**\n"
+        "1. **NVIDIA 그래픽 드라이버** 최신: https://www.nvidia.com/Download/index.aspx "
+        "(또는 GeForce Experience로 업데이트)\n"
+        "2. **CUDA Toolkit 12.x**: https://developer.nvidia.com/cuda-downloads "
+        "→ Windows → exe(local). PyTorch가 요구하는 버전(cu121 등)에 맞춰.\n"
+        "3. 설치 후 재부팅\n\n"
+        "**확인**\n```\nnvidia-smi\n```\n→ GPU 이름·드라이버·`CUDA Version` 표가 뜨면 드라이버 OK.\n"
+        "```\nnvcc --version\n```\n→ `release 12.x` 나오면 Toolkit OK.",
+    "PyTorch (GPU)":
+        "## PyTorch (GPU) — 로컬 FLUX/Hunyuan 실행 엔진\n"
+        "*gpt-image·Rodin(클라우드)만 쓰면 지금 안 해도 됩니다.*\n\n"
+        "**설치** (CUDA 12.1 빌드; 메인 파이썬 또는 venv)\n"
+        "```\npip install torch --index-url https://download.pytorch.org/whl/cu121\n```\n"
+        "venv로 격리(권장):\n"
+        "```\npy -3 -m venv venv\nvenv\\Scripts\\activate\npip install torch --index-url https://download.pytorch.org/whl/cu121\n```\n\n"
+        "**확인**\n```\npython -c \"import torch;print(torch.__version__, torch.cuda.is_available())\"\n```\n"
+        "→ `2.x.x True` 나오면 성공. (False면 드라이버/CUDA 버전 불일치)",
+    "Blender (선택·분석)":
+        "## Blender (선택 — 분석/블록아웃)\n"
+        "*3D 생성은 Hunyuan 담당. Blender는 레퍼런스·블록아웃·검수용.*\n\n"
+        "**설치**\n1. https://www.blender.org/download/ 설치\n\n"
+        "**확인**\n- `C:\\Program Files\\Blender Foundation\\Blender X.X` 폴더 존재\n- Blender 실행되면 OK.",
+    "FLUX.2 모델 (로컬)":
+        "## FLUX.2 [dev] (기본 로컬 이미지)\n"
+        "**설치**\n"
+        "```\npip install -U diffusers transformers accelerate huggingface_hub\n```\n"
+        "게이트 모델이면 HF 토큰 로그인:\n```\nhf auth login\n```\n"
+        "모델 받기(또는 첫 실행 시 자동):\n```\nhf download black-forest-labs/FLUX.2-dev\n```\n"
+        "*16GB VRAM은 fp8/양자화 로드 권장.*\n\n"
+        "**확인**\n- 캐시 `~/.cache/huggingface/hub/models--black-forest-labs--FLUX.2-dev` 존재\n"
+        "```\npython -c \"from huggingface_hub import scan_cache_dir; print([r.repo_id for r in scan_cache_dir().repos])\"\n```",
+    "OPENAI_API_KEY":
+        "## OpenAI 키 (gpt-image 쓸 때만)\n"
+        "**발급**\n1. https://platform.openai.com/api-keys → **Create new secret key**\n2. 결제수단 등록(gpt-image-1은 유료)\n\n"
+        "**저장**\n- 이 화면 **② 이미지 엔진에서 gpt-image 선택 → 키 입력 → '키 저장(.env)'**\n"
+        "- 그러면 `web/.env` 에 `OPENAI_API_KEY=...` 로 저장됨\n\n"
+        "**확인**\n- 저장 후 **다시 진단** → 이 항목이 초록(OK)으로.",
+    "Hunyuan3D-2 준비 (레포+모델)":
+        "## Hunyuan3D-2 (로컬 3D 생성)\n"
+        "**설치**\n"
+        "1. 레포 클론\n```\ngit clone https://github.com/Tencent/Hunyuan3D-2\n```\n"
+        "2. venv에서 의존성(레포 README대로)\n```\npip install -r requirements.txt\n```\n"
+        "   + 커스텀 rasterizer/텍스처 모듈 빌드가 필요할 수 있음(README 참고)\n"
+        "3. 모델 가중치는 **첫 실행 시 HF에서 자동 다운로드**(tencent/Hunyuan3D-2, 수 GB)\n"
+        "4. 레포 경로가 기본과 다르면 환경변수 `HunyuanDir` 지정\n\n"
+        "**확인**\n- 레포 폴더 존재 **AND** 캐시 `~/.cache/huggingface/hub/models--tencent--Hunyuan3D-2`(또는 `~/.cache/hy3dgen`) 존재\n"
+        "- 둘 다 있어야 이 항목이 OK.",
+    "RODIN_API_KEY (Hyper3D)":
+        "## Rodin / Hyper3D 키 (클라우드 3D)\n"
+        "*로컬 Hunyuan을 쓰면 불필요.*\n\n"
+        "**발급**\n1. Hyper3D/Rodin 계정에서 API 키 발급\n\n"
+        "**저장**\n- **② 3D 엔진에서 Rodin 선택 → 키 입력 → '키 저장(.env)'**\n\n"
+        "**확인**\n- 저장 후 **다시 진단** → OK.",
+    "Unreal Engine":
+        "## Unreal Engine\n"
+        "**설치**\n1. **Epic Games Launcher** 설치: https://store.epicgames.com/download\n"
+        "2. Launcher → Unreal Engine → **5.x 설치**(프로젝트 버전에 고정)\n\n"
+        "**확인**\n- `C:\\Program Files\\Epic Games\\UE_5.x` 폴더 존재.",
+    "unrealclaude MCP 등록":
+        "## UnrealClaude MCP 등록\n"
+        "**설치**\n```\nclaude mcp add --scope user unrealclaude -- node <플러그인경로>\\Resources\\mcp-bridge\\index.js\n```\n\n"
+        "**확인**\n```\nclaude mcp list\n```\n→ 목록에 `unrealclaude` (또는 `~/.claude.json` 에 항목 존재).",
+    "Blender MCP 등록":
+        "## Blender MCP 등록 (선택 — 블록아웃/분석)\n"
+        "*Claude로 Blender 조종. 언리얼 임포트·배치 전 편집용. 로컬 3D를 Hunyuan만으로 하면 생략 가능.*\n\n"
+        "**설치**\n1. Blender에 **BlenderMCP 애드온** 설치·활성화\n"
+        "2. MCP 등록:\n```\nclaude mcp add --scope user blender -- <blender-mcp 실행명령>\n```\n\n"
+        "**확인**\n```\nclaude mcp list\n```\n→ 목록에 `blender`.",
+    "Unreal 에디터 실행중":
+        "## 언리얼 에디터 실행\n"
+        "*임포트/배치/렌더 단계 전에만 필요. 이미지·3D 단계는 꺼져 있어도 됨.*\n\n"
+        "**방법**\n1. `.uproject` 더블클릭 또는 Launcher에서 프로젝트 열기\n\n"
+        "**확인**\n```\ntasklist | findstr UnrealEditor\n```\n→ `UnrealEditor.exe` 보이면 실행 중.",
+    "REST :3000 (execute_script)":
+        "## REST :3000 (플러그인 서버)\n"
+        "*언리얼 에디터 + UnrealClaude 플러그인이 켜지면 열림.*\n\n"
+        "**방법**\n1. 언리얼 에디터 실행(위 항목)\n2. UnrealClaude 플러그인 활성화\n\n"
+        "**확인**\n```\ncurl http://127.0.0.1:3000\n```\n→ 응답이 오면 열림. (에디터 꺼지면 닫힘)",
 }
 
 
