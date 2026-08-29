@@ -332,6 +332,7 @@ function buildDiagStages(data, pending) {
       const detail = pending ? (i.need || "") : (i.detail || "");
       h += `<div class="diag-row ${st}" title="${escapeAttr(detail)}"><div class="box">${icon}</div><div class="grow"><div class="nm">${escapeHtml(i.name)}${i.required ? '<span class="diag-star">★</span>' : ''}</div><div class="nd">${escapeHtml(detail)}</div></div></div>`;
     }
+    if (s.key === "image" && !pending) h += imageChooser();  // 진단 후: 엔진 하나 확정
     return h + `</div>`;
   };
 
@@ -352,6 +353,52 @@ function buildDiagStages(data, pending) {
   shown.forEach((s, oi) => { h += card(s, oi, ""); });
   return h + `</div>`;
 }
+
+// 이미지 엔진 선택 (진단 후, 하나 확정)
+function imageChooser() {
+  const choices = (ENGINES.roles && ENGINES.roles.image && ENGINES.roles.image.choices) || [];
+  const cur = (STATE.engine_choices || {}).image || "";
+  let h = `<div class="img-choose"><div class="ic-h">이미지 엔진 — 하나를 눌러 확정</div>`;
+  for (const c of choices) {
+    const needKey = /gpt-image/i.test(c);
+    const on = c === cur;
+    h += `<button class="img-opt ${on ? "on" : ""}" onclick="chooseImageEngine('${escapeAttr(c)}')">
+      <span class="io-dot">${on ? "●" : "○"}</span><span class="io-name">${escapeHtml(c)}</span>${needKey ? '<span class="io-tag key">🔑 키필요</span>' : '<span class="io-tag local">로컬</span>'}</button>`;
+  }
+  if (/gpt-image/i.test(cur) && !openaiKeyOk()) {
+    h += `<div class="key-row">
+      <input id="openaiKeyInput" type="password" placeholder="OPENAI_API_KEY 붙여넣기" autocomplete="off" spellcheck="false">
+      <button class="btn small" onclick="saveOpenAIKey()">키 저장(.env)</button>
+    </div><div class="hint" style="color:var(--warn);margin-top:4px">gpt-image는 키가 있어야 확정됩니다.</div>`;
+  }
+  const msg = !cur ? "아직 미선택 — 하나를 눌러 확정하세요"
+    : (imageEngineReady() ? `✓ '${escapeHtml(cur)}' 확정 준비됨` : "키 입력 후 확정 가능");
+  h += `<div class="ic-status ${!cur ? "wait" : (imageEngineReady() ? "ok" : "wait")}">${msg}</div>`;
+  return h + `</div>`;
+}
+function openaiKeyOk() {
+  const item = DIAG && (DIAG.items || []).find((i) => i.name === "OPENAI_API_KEY");
+  return !!(item && item.ok);
+}
+function imageEngineReady() {
+  const ch = (STATE.engine_choices || {}).image;
+  if (!ch) return false;
+  if (/gpt-image/i.test(ch)) return openaiKeyOk();
+  return true;
+}
+window.chooseImageEngine = async (v) => {
+  STATE = await postJSON(`/api/projects/${PID}/engine`, { key: "image", value: v });
+  renderCenter();
+};
+window.saveOpenAIKey = async () => {
+  const el = $("openaiKeyInput");
+  const v = el ? el.value.trim() : "";
+  if (!v) return;
+  await postJSON("/api/env", { key: "OPENAI_API_KEY", value: v });
+  if (el) el.value = "";
+  await runDiagnose();   // 재진단 → 키 OK 반영
+  renderCenter();        // 선택/게이트 갱신
+};
 
 window.runDiagnose = async () => {
   const btn = $("diagBtn"), stat = $("diagStatus"), res = $("diagResult");
@@ -543,8 +590,8 @@ async function saveFlow() {
 
 // ---------- 헬퍼 ----------
 function stepReady(s) {
-  // 진단 단계는 진단을 한 번 돌려야 확정 가능. 그 외는 필수 입력이 채워져야.
-  if (s.diagnostic) return DIAG_DONE;
+  // 진단 단계: 진단 완료 + 이미지 엔진 하나 확정(gpt면 키까지)돼야 확정 가능.
+  if (s.diagnostic) return DIAG_DONE && imageEngineReady();
   return inputsFilled(s);
 }
 function inputsFilled(s) {

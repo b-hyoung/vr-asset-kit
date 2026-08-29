@@ -148,6 +148,22 @@ code{font-family:var(--mono);font-size:12px;background:#0c0f13;border:1px solid 
 .diag-row.req .nm{color:#ff9c9c}
 .diag-row.warn .box{border-color:var(--warn);color:var(--warn);background:#241f14}
 .diag-row.pending{opacity:.72}
+/* 이미지 엔진 선택 */
+.img-choose{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+.ic-h{font-size:11px;color:var(--accent);font-family:var(--mono);margin-bottom:6px}
+.img-opt{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:#0c0f13;border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin-bottom:5px;color:var(--dim);font-size:12.5px}
+.img-opt:hover{border-color:var(--accent)}
+.img-opt.on{border-color:var(--accent);background:#122029;color:var(--ink)}
+.img-opt .io-dot{color:var(--accent);font-size:11px;flex:none}
+.img-opt .io-name{flex:1;min-width:0}
+.io-tag{font-size:10px;font-family:var(--mono);padding:1px 7px;border-radius:10px;border:1px solid var(--line);flex:none}
+.io-tag.local{color:var(--good);border-color:#2b5a3d}
+.io-tag.key{color:var(--warn);border-color:#5a4a2b}
+.key-row{display:flex;gap:6px;margin-top:6px}
+.key-row input{flex:1;background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:7px 9px;font-family:var(--mono);font-size:12px}
+.ic-status{margin-top:7px;font-size:12px;font-family:var(--mono)}
+.ic-status.ok{color:var(--good)}
+.ic-status.wait{color:var(--faint)}
 
 /* flow editor overlay */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50}

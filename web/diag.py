@@ -7,6 +7,7 @@
 import os, glob, json, shutil, subprocess, socket
 
 USER = os.path.expanduser("~")
+WEB = os.path.dirname(os.path.abspath(__file__))  # .../vr-harness/web
 
 # 파이프라인 순서(stage) — 이 순서대로 필요한 것을 묶어 보여준다.
 STAGES = [
@@ -124,6 +125,7 @@ def run(hunyuan_dir=None, env_file=None):
     candidates = []
     if env_file:
         candidates.append(env_file)
+    candidates.append(os.path.join(WEB, ".env"))  # 웹에서 저장한 키 우선
     candidates.append(os.path.join(USER, "Desktop", "bobs_project", "Core-CBT", ".env"))
     for p in candidates:
         try:

@@ -274,6 +274,24 @@ class Handler(BaseHTTPRequestHandler):
         p = u.path
         body = self._body_json()
 
+        if p == "/api/env":
+            # 허용 키만 web/.env 에 저장 (값은 반환/로그 안 함)
+            key = (body.get("key") or "").strip()
+            val = body.get("value") or ""
+            if key not in ("OPENAI_API_KEY",) or not val:
+                return self._json({"error": "허용 키/값 필요"}, 400)
+            envp = os.path.join(BASE, ".env")
+            lines = []
+            if os.path.exists(envp):
+                with open(envp, "r", encoding="utf-8") as f:
+                    lines = f.read().splitlines()
+            lines = [l for l in lines if not l.strip().startswith(key + "=")]
+            lines.append(key + "=" + val)
+            with open(envp, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines) + "\n")
+            os.environ[key] = val  # 현재 프로세스 진단에 즉시 반영
+            return self._json({"ok": True})
+
         if p == "/api/projects":
             with _lock:
                 pid = "vr_" + datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
