@@ -288,7 +288,7 @@ function specSummary(items) {
   return `<div class="diag-summary">
     <div class="cell"><div class="lb">핵심 ★</div><div class="big" style="color:var(--gate)">${req}</div></div>
     <div class="cell"><div class="lb">전체</div><div class="big">${items.length}</div></div>
-    <div class="diag-bar"><span style="width:0%"></span></div>
+    <div class="diag-bar"><span style="transform:scaleX(0)"></span></div>
     <div class="diag-note">미진단 — '진단 시작'을 누르세요</div>
   </div>`;
 }
@@ -303,7 +303,7 @@ function diagSummary(d) {
   return `<div class="diag-summary">
     <div class="cell"><div class="lb">핵심 ★ 준비</div><div class="big" style="color:${reqDone ? 'var(--good)' : 'var(--bad)'}">${reqOk}/${req.length}</div></div>
     <div class="cell"><div class="lb">전체 준비</div><div class="big">${allOk}/${items.length}</div></div>
-    <div class="diag-bar"><span style="width:${pct}%"></span></div>
+    <div class="diag-bar"><span style="transform:scaleX(${pct / 100})"></span></div>
     <div class="diag-note">${reqDone ? '<span style="color:var(--good)">핵심 준비 완료 — 확정 가능</span>' : '핵심 항목을 채우세요'}</div>
   </div>`;
 }
