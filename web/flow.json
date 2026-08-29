@@ -9,7 +9,7 @@
       "user_input": true,
       "diagnostic": true,
       "engines": [],
-      "doc_ref": "SETUP.md",
+      "doc_ref": "web/docs/steps/env.md",
       "desc": "필요 환경/도구를 리스트업하고 실제로 진단한다. 핵심(★) 항목: OpenAI 키·Hunyuan 모델·UnrealClaude MCP. 진단을 돌린 뒤 확정할 수 있다."
     },
     {
@@ -19,7 +19,7 @@
       "user_input": true,
       "inputs": ["topic", "background"],
       "engines": [],
-      "doc_ref": "RUN.md",
+      "doc_ref": "web/docs/steps/topic.md",
       "desc": "사용자가 직접 입력. 이전 세션/문서/예시에서 끌어오기 금지. 빈 값에서 시작."
     },
     {
@@ -29,7 +29,7 @@
       "user_input": true,
       "inputs": ["anchor"],
       "engines": [{ "role": "image", "key": "anchor.image" }],
-      "doc_ref": "templates/ambiguity-probe.md",
+      "doc_ref": "web/docs/steps/anchor.md",
       "desc": "은은/중간/뚜렷/하이 4장 생성 → 사용자가 1장 선택 = 스타일 앵커."
     },
     {
@@ -39,7 +39,7 @@
       "user_input": true,
       "inputs": ["asset_list"],
       "engines": [],
-      "doc_ref": "harness/questions.md",
+      "doc_ref": "web/docs/steps/assets.md",
       "desc": "AI가 앵커 대조로 빠진 에셋 제안 → '부족·빠진 거 있나요?' → 사용자 확정. 확정 전 제작 금지."
     },
     {
@@ -50,7 +50,7 @@
         { "role": "image", "key": "make.image" },
         { "role": "mesh_3d", "key": "make.mesh_3d" }
       ],
-      "doc_ref": "harness/pipeline.md",
+      "doc_ref": "web/docs/steps/make.md",
       "desc": "에셋마다 이미지 → 3D → Blender 수정 → 검수. 슬롯 8개 미충족 시 생성 금지."
     },
     {
@@ -58,7 +58,7 @@
       "title": "언리얼 임포트",
       "gate": false,
       "engines": [{ "role": "orchestration", "key": "ue_import.orchestration" }],
-      "doc_ref": "harness/pipeline.md",
+      "doc_ref": "web/docs/steps/ue_import.md",
       "desc": "UnrealClaude MCP 직접 조종. Nanite 끄기, M_*_AI 머티리얼 생성."
     },
     {
@@ -69,7 +69,7 @@
         { "role": "judge", "key": "place.judge" },
         { "role": "orchestration", "key": "place.orchestration" }
       ],
-      "doc_ref": "harness/scene-loop.md",
+      "doc_ref": "web/docs/steps/place.md",
       "desc": "산포·정렬. 판정은 심판/사용자 — AI 자기 채점 금지."
     },
     {
@@ -77,7 +77,7 @@
       "title": "노을 조명",
       "gate": false,
       "engines": [{ "role": "orchestration", "key": "dusk.orchestration" }],
-      "doc_ref": "harness/pipeline.md",
+      "doc_ref": "web/docs/steps/dusk.md",
       "desc": "태양 pitch -2~-3 · 색온도 3000~3800K. 기본 SkyLight 미개입(하드룰)."
     },
     {
@@ -85,7 +85,7 @@
       "title": "Export (자체완결 GLB)",
       "gate": true,
       "engines": [],
-      "doc_ref": "harness/pipeline.md",
+      "doc_ref": "web/docs/steps/export.md",
       "desc": "메시+텍스처+조명 포함 GLB. 최종 확인은 사용자."
     }
   ]
