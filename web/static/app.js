@@ -313,42 +313,43 @@ function buildDiagStages(data, pending) {
   const items = data.items || [];
   const byStage = {};
   items.forEach((i) => { (byStage[i.stage] = byStage[i.stage] || []).push(i); });
-  // 아이템이 있는 단계만 (순서 번호용)
   const shown = stages.filter((s) => (byStage[s.key] || []).length);
-  // 2x2 서펜타인일 때만 gap 화살표(→ ↓ ←)를 빈틈에 배치
-  const serp = shown.length === 4;
-  const gapArrows = serp
-    ? `<span class="gap-arrow a1">→</span><span class="gap-arrow a2">↓</span><span class="gap-arrow a3">←</span>`
-    : "";
-  let h = `<div class="diag-grid ${serp ? "serp" : ""}">` + gapArrows;
-  shown.forEach((s, oi) => {
+
+  // 한 단계 카드 HTML. areaCls 로 grid-area 지정.
+  const card = (s, oi, areaCls) => {
     const list = byStage[s.key] || [];
-    let badge = `<span class="stage-count">—</span>`;
-    let cardCls = "";
+    let badge = `<span class="stage-count">—</span>`, cardCls = "";
     if (!pending) {
       const ok = list.filter((i) => i.ok).length;
       const reqMiss = list.some((i) => i.required && !i.ok);
-      const cls = reqMiss ? "bad" : (ok === list.length ? "good" : "");
-      badge = `<span class="stage-count ${cls}">${ok}/${list.length}</span>`;
+      badge = `<span class="stage-count ${reqMiss ? "bad" : (ok === list.length ? "good" : "")}">${ok}/${list.length}</span>`;
       cardCls = reqMiss ? "stage-bad" : (ok === list.length ? "stage-good" : "");
     }
-    // 서펜타인: 3번째=우하, 4번째=좌하 (→ ↓ ← 흐름이 gap에 딱 맞게)
-    const posCls = serp ? (oi === 2 ? "pos-br" : (oi === 3 ? "pos-bl" : "")) : "";
-    h += `<div class="diag-stage ${cardCls} ${posCls}"><div class="stage-order">${oi + 1}</div><div class="diag-stage-h">${escapeHtml(s.label)} ${badge}</div>`;
+    let h = `<div class="diag-stage ${cardCls} ${areaCls}"><div class="stage-order">${oi + 1}</div><div class="diag-stage-h">${escapeHtml(s.label)} ${badge}</div>`;
     for (const i of list) {
       const st = pending ? "pending" : (i.ok ? "ok" : (i.required ? "req" : "warn"));
       const icon = st === "ok" ? "✓" : st === "req" ? "✕" : st === "warn" ? "!" : "";
       const detail = pending ? (i.need || "") : (i.detail || "");
-      h += `<div class="diag-row ${st}" title="${escapeAttr(detail)}">
-        <div class="box">${icon}</div>
-        <div class="grow">
-          <div class="nm">${escapeHtml(i.name)}${i.required ? '<span class="diag-star">★</span>' : ''}</div>
-          <div class="nd">${escapeHtml(detail)}</div>
-        </div>
-      </div>`;
+      h += `<div class="diag-row ${st}" title="${escapeAttr(detail)}"><div class="box">${icon}</div><div class="grow"><div class="nm">${escapeHtml(i.name)}${i.required ? '<span class="diag-star">★</span>' : ''}</div><div class="nd">${escapeHtml(detail)}</div></div></div>`;
     }
-    h += `</div>`;
-  });
+    return h + `</div>`;
+  };
+
+  // 4개면 서펜타인 그리드: 카드와 화살표를 실제 grid-area 칸에 배치 (gutter에 정확히)
+  if (shown.length === 4) {
+    return `<div class="diag-grid serp">`
+      + card(shown[0], 0, "g-c1")
+      + `<div class="gap-arrow g-a1">→</div>`
+      + card(shown[1], 1, "g-c2")
+      + `<div class="gap-arrow g-a2">↓</div>`
+      + card(shown[2], 2, "g-c3")
+      + `<div class="gap-arrow g-a3">←</div>`
+      + card(shown[3], 3, "g-c4")
+      + `</div>`;
+  }
+  // 폴백: 단순 그리드 (4개 아닐 때)
+  let h = `<div class="diag-grid plain">`;
+  shown.forEach((s, oi) => { h += card(s, oi, ""); });
   return h + `</div>`;
 }
 
