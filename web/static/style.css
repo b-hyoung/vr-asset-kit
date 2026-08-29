@@ -27,6 +27,17 @@ code{font-family:var(--mono);font-size:12px;background:#0c0f13;border:1px solid 
 .pane.right{border-left:1px solid var(--line);background:#12161c}
 .pane h2{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent);margin:0 0 12px}
 
+/* a→z 산출-흐름 미니 스트립 */
+.pipe{display:flex;align-items:center;flex-wrap:wrap;gap:3px;margin-bottom:14px;padding:8px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;font-size:12px}
+.pipe-chip{padding:3px 9px;border-radius:14px;color:var(--faint);white-space:nowrap}
+.pipe-chip.done{color:var(--good)}
+.pipe-chip.cur{background:var(--accent);color:#04121c;font-weight:800}
+.pipe-sep{color:var(--faint);font-size:11px}
+
+/* 좌측 그룹 헤더 */
+.flow-group{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--faint);font-family:var(--mono);margin:14px 0 5px;padding-left:2px}
+.flow-group:first-child{margin-top:0}
+
 /* flow list */
 .step-item{display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border-radius:8px;margin-bottom:4px;border:1px solid transparent}
 .step-item:hover{background:var(--panel)}

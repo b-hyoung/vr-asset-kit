@@ -99,10 +99,18 @@ function renderAll() {
   renderAudit();
 }
 
+// a→z 지도: 준비 → 제작 → 배치 → 완료 로 묶어서 표시
+const FLOW_GROUPS = [
+  { k: "준비", ids: ["env", "topic", "anchor", "assets"] },
+  { k: "제작", ids: ["make"] },
+  { k: "배치", ids: ["ue_import", "place", "dusk"] },
+  { k: "완료", ids: ["export"] },
+];
 function renderFlowList() {
   const box = $("flowList");
   box.innerHTML = "";
-  FLOW.steps.forEach((s, i) => {
+  const renderStep = (s) => {
+    const i = FLOW.steps.indexOf(s);
     const st = (STATE && STATE.steps[s.id]) || { status: "locked", gate: s.gate };
     const div = document.createElement("div");
     div.className = "step-item " + st.status +
@@ -110,18 +118,48 @@ function renderFlowList() {
       (s.gate ? " gate" : "") +
       (st.status === "done" ? " done" : "") +
       (st.status === "locked" ? " locked" : "");
-    const gateBadge = s.gate ? `<span class="badge gate">GATE</span>` : "";
+    const gateBadge = s.gate ? `<span class="badge gate">🔒</span>` : "";
     const stBadge =
       st.status === "done" ? `<span class="badge done">완료</span>` :
-      st.status === "locked" ? `<span class="badge lock">🔒</span>` :
       st.status === "awaiting_user" ? `<span class="badge gate">확정대기</span>` : "";
     div.innerHTML =
       `<div class="num">${i + 1}</div>
-       <div><div class="t">${escapeHtml(s.title)} ${gateBadge}${stBadge}</div>
-       <div class="meta">${s.id}${s.engines && s.engines.length ? " · ⚙엔진" : ""}</div></div>`;
+       <div><div class="t">${escapeHtml(s.title)} ${gateBadge}${stBadge}</div></div>`;
     div.onclick = () => { SELECTED = s.id; renderCenter(); renderFlowList(); };
     box.appendChild(div);
+  };
+  const used = new Set();
+  for (const g of FLOW_GROUPS) {
+    const steps = g.ids.map((id) => FLOW.steps.find((s) => s.id === id)).filter(Boolean);
+    if (!steps.length) continue;
+    const hd = document.createElement("div");
+    hd.className = "flow-group";
+    hd.textContent = g.k;
+    box.appendChild(hd);
+    steps.forEach((s) => { used.add(s.id); renderStep(s); });
+  }
+  FLOW.steps.filter((s) => !used.has(s.id)).forEach(renderStep);  // 그룹 밖 스텝 안전 처리
+}
+
+// 상단 산출-흐름 미니 스트립: 에셋이 어떻게 만들어져 검증되는지 한눈에
+const PIPE_CHIPS = [
+  { k: "준비" }, { k: "이미지", ic: "🖼" }, { k: "3D", ic: "🧊" },
+  { k: "검수", ic: "🔍", gate: true }, { k: "배치", ic: "🏙", gate: true },
+  { k: "노을", ic: "🌅" }, { k: "export", ic: "📦" },
+];
+const PIPE_MAP = {  // step id → [현재 시작칩, 끝칩]
+  env: [0, 0], topic: [0, 0], anchor: [0, 0], assets: [0, 0],
+  make: [1, 3], ue_import: [4, 4], place: [4, 4], dusk: [5, 5], export: [6, 6],
+};
+function pipelineStrip(stepId) {
+  const [cs, ce] = PIPE_MAP[stepId] || [0, 0];
+  let h = `<div class="pipe" title="에셋 제작→검증 흐름">`;
+  PIPE_CHIPS.forEach((c, idx) => {
+    const st = idx < cs ? "done" : (idx >= cs && idx <= ce ? "cur" : "future");
+    h += `<span class="pipe-chip ${st}">${c.ic ? c.ic + " " : ""}${c.k}${c.gate ? " 🔒" : ""}</span>`;
+    if (idx < PIPE_CHIPS.length - 1) h += `<span class="pipe-sep">→</span>`;
   });
+  return h + `</div>`;
 }
 
 function renderCenter() {
@@ -132,7 +170,7 @@ function renderCenter() {
   const st = STATE.steps[s.id] || {};
   const locked = st.status === "locked";
 
-  let html = `<div class="card"><h3>${escapeHtml(s.title)}</h3>
+  let html = pipelineStrip(s.id) + `<div class="card"><h3>${escapeHtml(s.title)}</h3>
     <p class="desc">${escapeHtml(s.desc || "")}</p>`;
 
   if (locked) {
