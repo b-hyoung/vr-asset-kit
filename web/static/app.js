@@ -276,10 +276,11 @@ function renderDiagSpec(data) {
 function paintDiag(d) {
   const stat = $("diagStatus"), res = $("diagResult");
   if (!stat || !res) return;
-  const miss = d.required_missing || [];
+  // 현재 엔진 선택에 관련된 필수 항목만 집계
+  const miss = (d.items || []).filter((i) => i.required && itemRelevant(i.dep) && !i.ok).map((i) => i.name);
   stat.innerHTML = miss.length
     ? `<span style="color:var(--warn)">핵심 확인필요: ${escapeHtml(miss.join(", "))}</span>`
-    : `<span style="color:var(--good)">핵심 준비됨 ✅ — 확정 가능</span>`;
+    : `<span style="color:var(--good)">핵심 준비됨 ✅</span>`;
   res.innerHTML = diagSummary(d) + buildDiagStages(d, false);
 }
 
@@ -294,7 +295,7 @@ function specSummary(items) {
 }
 
 function diagSummary(d) {
-  const items = d.items || [];
+  const items = (d.items || []).filter((i) => itemRelevant(i.dep));   // 선택에 관련된 것만
   const req = items.filter((i) => i.required);
   const reqOk = req.filter((i) => i.ok).length;
   const allOk = items.filter((i) => i.ok).length;
@@ -321,20 +322,23 @@ function buildDiagStages(data, pending) {
     const list = byStage[s.key] || [];
     let badge = `<span class="stage-count">—</span>`, cardCls = "";
     if (!pending) {
-      const ok = list.filter((i) => i.ok).length;
-      const reqMiss = list.some((i) => i.required && !i.ok);
-      badge = `<span class="stage-count ${reqMiss ? "bad" : (ok === list.length ? "good" : "")}">${ok}/${list.length}</span>`;
-      cardCls = reqMiss ? "stage-bad" : (ok === list.length ? "stage-good" : "");
+      const rel = list.filter((i) => itemRelevant(i.dep));   // 선택에 관련된 항목만 집계
+      const ok = rel.filter((i) => i.ok).length;
+      const reqMiss = rel.some((i) => i.required && !i.ok);
+      badge = `<span class="stage-count ${reqMiss ? "bad" : (ok === rel.length ? "good" : "")}">${ok}/${rel.length}</span>`;
+      cardCls = reqMiss ? "stage-bad" : (ok === rel.length ? "stage-good" : "");
     }
     let h = `<div class="diag-stage ${cardCls} ${areaCls}"><div class="stage-order">${oi + 1}</div><div class="diag-stage-h">${escapeHtml(s.label)} ${badge}</div>`;
     for (const i of list) {
-      const st = pending ? "pending" : (i.ok ? "ok" : (i.required ? "req" : "warn"));
-      const icon = st === "ok" ? "✓" : st === "req" ? "✕" : st === "warn" ? "!" : "";
-      const detail = pending ? (i.need || "") : (i.detail || "");
-      const guideBtn = (!pending && !i.ok && i.guide) ? `<button class="btn small guide-btn" onclick="openGuide('${escapeAttr(i.name)}')">설치</button>` : "";
-      h += `<div class="diag-row ${st}" title="${escapeAttr(detail)}"><div class="box">${icon}</div><div class="grow"><div class="nm">${escapeHtml(i.name)}${i.required ? '<span class="diag-star">★</span>' : ''}</div><div class="nd">${escapeHtml(detail)}</div></div>${guideBtn}</div>`;
+      const rel = pending ? true : itemRelevant(i.dep);
+      const st = pending ? "pending" : (!rel ? "irrelevant" : (i.ok ? "ok" : (i.required ? "req" : "warn")));
+      const icon = st === "ok" ? "✓" : st === "req" ? "✕" : st === "warn" ? "!" : st === "irrelevant" ? "–" : "";
+      const detail = !rel ? "현재 엔진 선택엔 불필요" : (pending ? (i.need || "") : (i.detail || ""));
+      const guideBtn = (!pending && rel && !i.ok && i.guide) ? `<button class="btn small guide-btn" onclick="openGuide('${escapeAttr(i.name)}')">설치</button>` : "";
+      h += `<div class="diag-row ${st}" title="${escapeAttr(detail)}"><div class="box">${icon}</div><div class="grow"><div class="nm">${escapeHtml(i.name)}${(i.required && rel) ? '<span class="diag-star">★</span>' : ''}</div><div class="nd">${escapeHtml(detail)}</div></div>${guideBtn}</div>`;
     }
-    if (s.key === "image" && !pending) h += imageChooser();  // 진단 후: 엔진 하나 확정
+    if (s.key === "image" && !pending) h += imageChooser();  // 진단 후: 이미지 엔진 확정
+    if (s.key === "mesh" && !pending) h += meshChooser();    // 진단 후: 3D 엔진 확정
     return h + `</div>`;
   };
 
@@ -401,6 +405,72 @@ window.saveOpenAIKey = async () => {
   await runDiagnose();   // 재진단 → 키 OK 반영
   renderCenter();        // 선택/게이트 갱신
 };
+
+// 3D 엔진 선택 (Hunyuan 로컬 / Rodin 클라우드)
+function meshChooser() {
+  const choices = (ENGINES.roles && ENGINES.roles.mesh_3d && ENGINES.roles.mesh_3d.choices) || [];
+  const cur = (STATE.engine_choices || {}).mesh_3d || "";
+  let h = `<div class="img-choose"><div class="ic-h">3D 엔진 — 하나를 눌러 확정</div>`;
+  for (const c of choices) {
+    const cloud = isCloudMesh(c);
+    const on = c === cur;
+    h += `<button class="img-opt ${on ? "on" : ""}" onclick="chooseMeshEngine('${escapeAttr(c)}')">
+      <span class="io-dot">${on ? "●" : "○"}</span><span class="io-name">${escapeHtml(c)}</span>${cloud ? '<span class="io-tag key">🔑 키필요</span>' : '<span class="io-tag local">로컬</span>'}</button>`;
+  }
+  if (isCloudMesh(cur) && !rodinKeyOk()) {
+    h += `<div class="key-row">
+      <input id="rodinKeyInput" type="password" placeholder="RODIN_API_KEY 붙여넣기" autocomplete="off" spellcheck="false">
+      <button class="btn small" onclick="saveRodinKey()">키 저장(.env)</button>
+    </div><div class="hint" style="color:var(--warn);margin-top:4px">Rodin은 키가 있어야 확정됩니다.</div>`;
+  }
+  const msg = !cur ? "아직 미선택 — 하나를 눌러 확정하세요"
+    : (meshEngineReady() ? `✓ '${escapeHtml(cur)}' 확정 준비됨` : "키 입력 후 확정 가능");
+  h += `<div class="ic-status ${!cur ? "wait" : (meshEngineReady() ? "ok" : "wait")}">${msg}</div>`;
+  return h + `</div>`;
+}
+function isCloudMesh(v) { return /rodin|hyper3d|클라우드/i.test(v || ""); }
+function rodinKeyOk() {
+  const item = DIAG && (DIAG.items || []).find((i) => i.name === "RODIN_API_KEY (Hyper3D)");
+  return !!(item && item.ok);
+}
+function meshEngineReady() {
+  const ch = (STATE.engine_choices || {}).mesh_3d;
+  if (!ch) return false;
+  if (isCloudMesh(ch)) return rodinKeyOk();
+  return true;
+}
+function enginesReady() { return imageEngineReady() && meshEngineReady(); }
+window.chooseMeshEngine = async (v) => {
+  STATE = await postJSON(`/api/projects/${PID}/engine`, { key: "mesh_3d", value: v });
+  renderCenter();
+};
+window.saveRodinKey = async () => {
+  const el = $("rodinKeyInput");
+  const v = el ? el.value.trim() : "";
+  if (!v) return;
+  await postJSON("/api/env", { key: "RODIN_API_KEY", value: v });
+  if (el) el.value = "";
+  await runDiagnose();
+  renderCenter();
+};
+
+// 항목이 현재 엔진 선택에 필요한지 (선택에 따라 불필요한 건 회색+필수제외)
+function itemRelevant(dep) {
+  const ic = (STATE.engine_choices || {}).image || "";
+  const mc = (STATE.engine_choices || {}).mesh_3d || "";
+  const cloudImage = /gpt-image/i.test(ic);
+  const cloudMesh = isCloudMesh(mc);
+  const localImage = ic && !cloudImage;
+  const localMesh = mc && !cloudMesh;
+  switch (dep) {
+    case "local": return !(cloudImage && cloudMesh);   // 둘 다 클라우드로 확정돼야 불필요
+    case "image:local": return !cloudImage;
+    case "image:cloud": return !localImage;
+    case "mesh:local": return !cloudMesh;
+    case "mesh:cloud": return !localMesh;
+    default: return true;
+  }
+}
 
 window.runDiagnose = async () => {
   const btn = $("diagBtn"), stat = $("diagStatus"), res = $("diagResult");
@@ -601,8 +671,8 @@ async function saveFlow() {
 
 // ---------- 헬퍼 ----------
 function stepReady(s) {
-  // 진단 단계: 진단 완료 + 이미지 엔진 하나 확정(gpt면 키까지)돼야 확정 가능.
-  if (s.diagnostic) return DIAG_DONE && imageEngineReady();
+  // 진단 단계: 진단 완료 + 이미지·3D 엔진 확정(클라우드면 키까지)돼야 확정 가능.
+  if (s.diagnostic) return DIAG_DONE && enginesReady();
   return inputsFilled(s);
 }
 function inputsFilled(s) {

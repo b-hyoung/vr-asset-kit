@@ -148,6 +148,9 @@ code{font-family:var(--mono);font-size:12px;background:#0c0f13;border:1px solid 
 .diag-row.req .nm{color:#ff9c9c}
 .diag-row.warn .box{border-color:var(--warn);color:var(--warn);background:#241f14}
 .diag-row.pending{opacity:.72}
+.diag-row.irrelevant{opacity:.38}
+.diag-row.irrelevant .box{border-style:dashed;color:var(--faint)}
+.diag-row.irrelevant .nd{font-style:normal;color:var(--faint)}
 .diag-row .guide-btn{flex:none;padding:3px 10px;font-size:11px;background:#122029;border:1px solid #2b4a5a;color:var(--accent)}
 .diag-row .guide-btn:hover{background:#16303d}
 /* 이미지 엔진 선택 */

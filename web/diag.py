@@ -23,7 +23,7 @@ NAME_STAGE = {
     "CUDA / GPU (nvidia-smi)": "base", "PyTorch (GPU)": "base",
     "Blender (선택·분석)": "base",
     "FLUX.2 모델 (로컬)": "image", "OPENAI_API_KEY": "image",
-    "Hunyuan3D-2 준비 (레포+모델)": "mesh",
+    "Hunyuan3D-2 준비 (레포+모델)": "mesh", "RODIN_API_KEY (Hyper3D)": "mesh",
     "Unreal Engine": "unreal", "unrealclaude MCP 등록": "unreal",
     "Unreal 에디터 실행중": "unreal", "REST :3000 (execute_script)": "unreal",
 }
@@ -40,6 +40,7 @@ GUIDES = {
     "FLUX.2 모델 (로컬)": "### FLUX.2 [dev] 모델 받기\n```\npip install -U diffusers transformers accelerate\nhf download black-forest-labs/FLUX.2-dev\n```\n또는 첫 실행 시 자동 다운로드(HF 캐시). 16GB VRAM은 fp8 권장.",
     "OPENAI_API_KEY": "### OpenAI 키 (gpt-image 쓸 때만)\n1. https://platform.openai.com/api-keys 에서 키 발급\n2. 이 화면 **엔진 선택에서 gpt-image → 키 입력 → 저장** 하면 `.env`에 저장됩니다.",
     "Hunyuan3D-2 준비 (레포+모델)": "### Hunyuan3D-2 (로컬 3D)\n```\ngit clone https://github.com/Tencent/Hunyuan3D-2\n```\n- venv에서 의존성 설치(레포 README)\n- 모델 가중치는 첫 실행 시 HF에서 자동 다운로드(수 GB)\n- 경로 지정: 환경변수 `HunyuanDir`",
+    "RODIN_API_KEY (Hyper3D)": "### Rodin / Hyper3D 키 (클라우드 3D 쓸 때만)\n1. Hyper3D/Rodin에서 API 키 발급\n2. 3D 엔진 선택에서 **Rodin/Hyper3D → 키 입력 → 저장** 하면 `.env`에 저장됩니다.\n\n※ 로컬 Hunyuan을 쓰면 이 키는 불필요.",
     "Unreal Engine": "### Unreal Engine\n1. Epic Games Launcher → UE 5.x 설치 (프로젝트 버전 고정)\n2. 확인: `C:\\Program Files\\Epic Games\\UE_5.x`",
     "unrealclaude MCP 등록": "### UnrealClaude MCP 등록\n```\nclaude mcp add --scope user unrealclaude -- node <플러그인>\\Resources\\mcp-bridge\\index.js\n```\n`~/.claude.json` 에 등록됨.",
     "Unreal 에디터 실행중": "### 언리얼 에디터 실행\n임포트/배치/렌더 단계 전에 프로젝트를 연다. (이미지·3D 단계는 없어도 됨)",
@@ -47,10 +48,29 @@ GUIDES = {
 }
 
 
+# 항목이 어떤 엔진 선택에 의존하는지(dep) — 프론트가 선택에 따라 관련/불필요 판단.
+#  always     : 항상
+#  local      : 로컬 생성(FLUX or Hunyuan) 하나라도 고르면
+#  image:local: 이미지=로컬(FLUX/SD/Qwen)일 때
+#  image:cloud: 이미지=gpt-image 일 때
+#  mesh:local : 3D=Hunyuan(로컬)일 때
+#  mesh:cloud : 3D=Rodin/Hyper3D(클라우드)일 때
+DEP = {
+    "python (py 포함)": "always", "node": "always", "git": "always", "uv": "always",
+    "Blender (선택·분석)": "always",
+    "CUDA / GPU (nvidia-smi)": "local", "PyTorch (GPU)": "local",
+    "FLUX.2 모델 (로컬)": "image:local", "OPENAI_API_KEY": "image:cloud",
+    "Hunyuan3D-2 준비 (레포+모델)": "mesh:local", "RODIN_API_KEY (Hyper3D)": "mesh:cloud",
+    "Unreal Engine": "always", "unrealclaude MCP 등록": "always",
+    "Unreal 에디터 실행중": "always", "REST :3000 (execute_script)": "always",
+}
+
+
 def _attach_meta(items):
     for it in items:
         it["stage"] = NAME_STAGE.get(it["name"], "base")
         it["guide"] = GUIDES.get(it["name"], "")
+        it["dep"] = DEP.get(it["name"], "always")
     return items
 
 
@@ -87,6 +107,7 @@ def spec():
         {"name": "FLUX.2 모델 (로컬)", "required": False, "need": "기본 이미지 엔진 — FLUX.2 [dev] diffusers (HF 캐시)"},
         {"name": "OPENAI_API_KEY", "required": False, "need": "대안 — gpt-image-1 엔진 고를 때만"},
         {"name": "Hunyuan3D-2 준비 (레포+모델)", "required": True, "need": "로컬 3D 생성 — 레포+가중치"},
+        {"name": "RODIN_API_KEY (Hyper3D)", "required": False, "need": "클라우드 3D(Rodin/Hyper3D) 쓸 때만"},
         {"name": "Unreal Engine", "required": False, "need": "UE_5.x — 임포트/배치/렌더"},
         {"name": "unrealclaude MCP 등록", "required": True, "need": "언리얼 직접 조종"},
         {"name": "Unreal 에디터 실행중", "required": False, "need": "임포트 단계 전에 열 것"},
@@ -210,6 +231,27 @@ def run(hunyuan_dir=None, env_file=None):
     else:
         detail = "레포·모델 모두 없음 — git clone + 모델 다운로드"
     add("", "Hunyuan3D-2 준비 (레포+모델)", both, detail, required=True)
+
+    # Rodin/Hyper3D 키 (클라우드 3D 대안)
+    rk, rk_where = False, ""
+    for p in [os.path.join(WEB, ".env"), os.path.join(USER, "Desktop", "bobs_project", "Core-CBT", ".env")]:
+        try:
+            if os.path.isfile(p):
+                with open(p, encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        s = line.strip()
+                        if s.startswith("RODIN_API_KEY") and "=" in s and s.split("=", 1)[1].strip():
+                            rk, rk_where = True, p
+                            break
+            if rk:
+                break
+        except Exception:
+            pass
+    if not rk and os.environ.get("RODIN_API_KEY"):
+        rk, rk_where = True, "환경변수"
+    add("", "RODIN_API_KEY (Hyper3D)", rk,
+        ("있음 @ " + rk_where + " (값 숨김)") if rk else "없음 — 클라우드 3D(Rodin) 쓸 때만. 3D 엔진에서 Rodin 선택 시 키 입력",
+        required=False)
 
     # === D. 언리얼 조종 (UnrealClaude MCP) ===
     D = "D. 언리얼 (UnrealClaude MCP)"

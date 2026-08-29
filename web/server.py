@@ -278,7 +278,7 @@ class Handler(BaseHTTPRequestHandler):
             # 허용 키만 web/.env 에 저장 (값은 반환/로그 안 함)
             key = (body.get("key") or "").strip()
             val = body.get("value") or ""
-            if key not in ("OPENAI_API_KEY",) or not val:
+            if key not in ("OPENAI_API_KEY", "RODIN_API_KEY") or not val:
                 return self._json({"error": "허용 키/값 필요"}, 400)
             envp = os.path.join(BASE, ".env")
             lines = []

@@ -7,9 +7,9 @@
       "default": "FLUX.2 [dev] (로컬 diffusers)"
     },
     "mesh_3d": {
-      "label": "이미지 → 3D",
-      "choices": ["Hunyuan3D-2(standalone)", "Rodin(Hyper3D)", "Blender-MCP"],
-      "default": "Hunyuan3D-2(standalone)"
+      "label": "3D 생성 (이미지→3D)",
+      "choices": ["Hunyuan3D-2 (로컬)", "Rodin/Hyper3D (클라우드)"],
+      "default": "Hunyuan3D-2 (로컬)"
     },
     "judge": {
       "label": "배치/품질 심판",
