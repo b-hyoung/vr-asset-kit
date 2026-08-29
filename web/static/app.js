@@ -242,14 +242,40 @@ async function loadExampleBody() {
 // ---------- 진단 (환경·도구 체크) ----------
 function renderDiagnosticBlock() {
   let h = `<div style="margin-top:6px">
-    <div class="hint" style="margin-bottom:8px">필요 환경/도구를 진단합니다. <b style="color:var(--gate)">★</b> = 핵심 필수(OpenAI 키·Hunyuan 모델·UnrealClaude MCP).</div>
+    <div class="hint" style="margin-bottom:8px">아래는 <b>필요 환경/도구 체크리스트</b>입니다. <b style="color:var(--gate)">★</b> = 핵심 필수(OpenAI 키·Hunyuan 모델·UnrealClaude MCP). <b>진단 시작</b>을 누르면 각 항목을 실제로 점검합니다.</div>
     <button class="btn small" id="diagBtn" onclick="runDiagnose()">진단 시작</button>
     <span id="diagStatus" class="hint" style="margin-left:8px"></span>
     <div id="diagResult" style="margin-top:10px"></div>
   </div>`;
-  // 이미 이번 세션에 진단했으면 결과 복원
-  if (DIAG) {
-    setTimeout(() => { paintDiag(DIAG); }, 0);
+  // 진입 즉시: 이미 진단했으면 결과, 아니면 체크리스트(미확인)를 먼저 리스트업
+  setTimeout(() => { if (DIAG) paintDiag(DIAG); else loadDiagSpec(); }, 0);
+  return h;
+}
+
+async function loadDiagSpec() {
+  const res = $("diagResult");
+  if (!res) return;
+  res.innerHTML = `<div class="hint">체크리스트 불러오는 중…</div>`;
+  try {
+    const s = await api("/api/diagnose/spec");
+    res.innerHTML = renderDiagSpec(s.items || []);
+  } catch (e) {
+    res.innerHTML = `<div class="hint" style="color:var(--bad)">체크리스트 로드 실패: ${e.message}</div>`;
+  }
+}
+
+function renderDiagSpec(items) {
+  const cats = {};
+  items.forEach((i) => { (cats[i.category] = cats[i.category] || []).push(i); });
+  let h = `<div class="hint" style="margin-bottom:2px">체크리스트 (진단 전 · <span style="color:var(--faint)">미확인 ⬚</span>)</div>`;
+  for (const c of Object.keys(cats)) {
+    h += `<div style="margin-top:10px;font-size:11px;color:var(--faint);font-family:var(--mono)">${escapeHtml(c)}</div>`;
+    for (const i of cats[c]) {
+      h += `<div style="display:flex;gap:8px;padding:3px 0;font-size:12.5px;align-items:baseline">
+        <span style="color:var(--faint);width:16px;flex:none">⬚</span>
+        <span style="min-width:170px;flex:none">${escapeHtml(i.name)}${i.required ? ' <b style="color:var(--gate)">★</b>' : ''}</span>
+        <span class="faint" style="font-size:11.5px">${escapeHtml(i.need || '')}</span></div>`;
+    }
   }
   return h;
 }

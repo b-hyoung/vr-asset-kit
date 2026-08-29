@@ -233,6 +233,10 @@ class Handler(BaseHTTPRequestHandler):
             if st is None:
                 return self._json({"error": "no project"}, 404)
             return self._json(st)
+        if p == "/api/diagnose/spec":
+            if diag is None:
+                return self._json({"error": "diag 모듈 로드 실패"}, 500)
+            return self._json(diag.spec())
         if p == "/api/diagnose":
             if diag is None:
                 return self._json({"error": "diag 모듈 로드 실패"}, 500)

@@ -28,6 +28,27 @@ def _port_open(port, host="127.0.0.1"):
         return False
 
 
+def spec():
+    """진단 전에 먼저 보여줄 체크리스트 정의 (검사 실행 없이 빠르게).
+    run() 이 채우는 항목 이름과 1:1로 맞춘다."""
+    return {"items": [
+        {"category": "A. 로컬 소프트웨어", "name": "Unreal Engine", "required": False, "need": "UE_5.x — 임포트/배치/렌더에 필요"},
+        {"category": "A. 로컬 소프트웨어", "name": "python (py 포함)", "required": True, "need": "모든 스크립트 실행"},
+        {"category": "A. 로컬 소프트웨어", "name": "uv", "required": False, "need": "파이썬 패키지 관리 (선택)"},
+        {"category": "A. 로컬 소프트웨어", "name": "node", "required": False, "need": "MCP 브릿지 실행"},
+        {"category": "A. 로컬 소프트웨어", "name": "git", "required": False, "need": "버전관리"},
+        {"category": "A. 로컬 소프트웨어", "name": "Blender (선택)", "required": False, "need": "블록아웃/레퍼런스 쓸 때만"},
+        {"category": "B. 이미지 (OpenAI)", "name": "OPENAI_API_KEY", "required": True, "need": "gpt-image-1 이미지 생성 키"},
+        {"category": "C. 3D (Hunyuan3D-2)", "name": "Hunyuan3D-2 레포", "required": False, "need": "이미지→3D 로컬 레포"},
+        {"category": "C. 3D (Hunyuan3D-2)", "name": "venv (PyTorch)", "required": False, "need": "Hunyuan 실행 가상환경"},
+        {"category": "C. 3D (Hunyuan3D-2)", "name": "torch CUDA", "required": False, "need": "GPU 가속 (없으면 느림)"},
+        {"category": "C. 3D (Hunyuan3D-2)", "name": "★ Hunyuan 모델 다운로드", "required": True, "need": "3D 생성 가중치 (수 GB)"},
+        {"category": "D. 언리얼 (UnrealClaude MCP)", "name": "unrealclaude MCP 등록", "required": True, "need": "언리얼 직접 조종"},
+        {"category": "D. 언리얼 (UnrealClaude MCP)", "name": "Unreal 에디터 실행중", "required": False, "need": "임포트 단계 전에 열 것"},
+        {"category": "D. 언리얼 (UnrealClaude MCP)", "name": "REST :3000 (execute_script)", "required": False, "need": "에디터+플러그인 서버"},
+    ]}
+
+
 def run(hunyuan_dir=None, env_file=None):
     items = []
 
