@@ -631,7 +631,9 @@ function imageChooser() {
 
   // 로컬 엔진: 카탈로그에서 모델 선택(hover 설명) + 직접입력
   if (cur && !/gpt-image/i.test(cur)) {
-    h += `<div class="model-pick"><div class="hint" style="margin-bottom:6px">모델 선택 (마우스를 올리면 설명):</div>`;
+    h += `<div class="model-pick">`;
+    if (MODELS.image_guide) h += `<div class="step-help" style="margin:2px 0 8px">${escapeHtml(MODELS.image_guide)}</div>`;
+    h += `<div class="hint" style="margin-bottom:6px">모델 선택 (마우스를 올리면 설명):</div>`;
     h += `<div class="model-list">`;
     for (const m of (MODELS.image || [])) {
       const on = m.repo === repo;
