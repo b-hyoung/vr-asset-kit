@@ -74,9 +74,9 @@ def _load_env_vars():
                     d[k.strip()] = v.strip()
     except Exception:
         pass
-    # huggingface_hub 은 HF_TOKEN 을 읽음 — HUGGING_FACE_HUB_TOKEN 로도 미러
-    if d.get("HF_TOKEN") and not d.get("HUGGING_FACE_HUB_TOKEN"):
-        d["HUGGING_FACE_HUB_TOKEN"] = d["HF_TOKEN"]
+    # HF 토큰은 login(표준 토큰파일)으로 관리 → 무효한 .env 값이 덮지 않게 제외
+    d.pop("HF_TOKEN", None)
+    d.pop("HUGGING_FACE_HUB_TOKEN", None)
     return d
 
 
@@ -302,6 +302,19 @@ class Handler(BaseHTTPRequestHandler):
             if st is None:
                 return self._json({"error": "no project"}, 404)
             return self._json(st)
+        if p == "/api/hf/whoami":
+            info = {"logged_in": False, "name": None, "invalid": False}
+            try:
+                from huggingface_hub import whoami, get_token
+                if get_token():
+                    try:
+                        info["name"] = whoami().get("name")
+                        info["logged_in"] = True
+                    except Exception:
+                        info["invalid"] = True   # 토큰 있으나 무효
+            except Exception:
+                pass
+            return self._json(info)
         if p == "/api/hf/present":
             repo = (q.get("repo", [""])[0]) or ""
             present, size = False, None
@@ -393,6 +406,19 @@ class Handler(BaseHTTPRequestHandler):
                 INSTALL_STATE[item] = {"running": True, "code": None, "lines": []}
             threading.Thread(target=_run_install, args=(item, cmds), daemon=True).start()
             return self._json({"started": True})
+
+        if p == "/api/hf/login":
+            # HF 토큰으로 로그인(검증+표준 토큰 저장) → 이후 모든 다운로드 자동 사용
+            token = (body.get("token") or "").strip()
+            if not token:
+                return self._json({"error": "토큰 필요"}, 400)
+            try:
+                from huggingface_hub import login, whoami
+                login(token=token, add_to_git_credential=False)
+                name = whoami().get("name")
+                return self._json({"ok": True, "name": name})
+            except Exception as e:
+                return self._json({"error": "로그인 실패: " + str(e)[:160]}, 400)
 
         if p == "/api/env":
             # 허용 키만 web/.env 에 저장 (값은 반환/로그 안 함)

@@ -19,6 +19,11 @@ let MODELS = { image: [] };    // 이미지 모델 카탈로그
 let MODEL_PRESENT = {};        // repo -> true/false/undefined(확인중)
 let CHECKING = new Set();      // 존재 확인 진행중 repo (중복 fetch 방지)
 let KEY_SAVED = new Set();     // 이번 세션에 저장한 키(즉시 반영)
+let HF_USER = null;            // {logged_in, name, invalid}
+
+async function loadHfWhoami() {
+  try { HF_USER = await api("/api/hf/whoami"); } catch (e) { HF_USER = { logged_in: false }; }
+}
 
 async function checkPresence(repo) {
   if (!repo) return;
@@ -68,6 +73,7 @@ async function init() {
   try { EXAMPLES = (await api("/api/examples")).examples || []; } catch (e) { EXAMPLES = []; }
   try { const a = await api("/api/install/available"); AUTO_INSTALL = new Set(a.items || []); WINGET = !!a.winget; } catch (e) {}
   try { MODELS = await api("/api/models"); } catch (e) { MODELS = { image: [] }; }
+  await loadHfWhoami();
 
   $("newProjectBtn").onclick = onNewProject;
   $("editFlowBtn").onclick = openFlowEditor;
@@ -508,17 +514,7 @@ function imageChooser() {
       h += `<div class="ic-status ${ok ? "ok" : "wait"}" style="margin-top:8px">${statusTxt}</div>`;
       if (pres === false) {
         h += `<button class="btn gate" style="margin-top:6px" onclick="installImageModel()">⚡ 이 모델 설치(다운로드)</button>
-          <div class="auth-box" style="margin-top:8px">
-            <div class="hint" style="margin-bottom:6px">🔒 게이트 모델이면 토큰+동의 필요</div>
-            <div style="display:flex;gap:6px;margin-bottom:6px">
-              <input id="hfToken" type="password" placeholder="HF 토큰 (hf_...)" autocomplete="off" spellcheck="false" style="flex:1;background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px">
-              <button class="btn small" onclick="saveHfToken()">토큰 저장</button>
-            </div>
-            <div style="display:flex;gap:12px;font-size:12px">
-              <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noreferrer" style="color:var(--accent)">① 토큰 발급 ↗</a>
-              <a href="#" onclick="window.open('https://huggingface.co/' + encodeURIComponent('${escapeAttr(repo)}'));return false" style="color:var(--accent)">② 라이선스 동의 ↗</a>
-            </div>
-          </div>
+          ${hfAuthBox(repo)}
           <span class="hint" id="instHint" style="display:block;margin-top:6px"></span>
           <pre id="instLog" class="inst-log"></pre>`;
       }
@@ -729,23 +725,44 @@ window.openGuide = (name) => {
   $("docOverlay").classList.add("open");
 };
 
-window.saveHfToken = async () => {
+// HF 로그인 상태에 맞춰 인증 박스 렌더
+function hfAuthBox(repo) {
+  const licLink = `<a href="#" onclick="window.open('https://huggingface.co/' + encodeURIComponent('${escapeAttr(repo)}'));return false" style="color:var(--accent)">② 이 모델 라이선스 동의 ↗</a>`;
+  if (HF_USER && HF_USER.logged_in) {
+    return `<div class="auth-box">
+      <div class="hint" style="color:var(--good)">✅ HuggingFace 로그인됨: <b>${escapeHtml(HF_USER.name || "")}</b> — 토큰 재입력 불필요</div>
+      <div style="margin-top:6px;font-size:12px">게이트 모델이면 ${licLink} 한 번만 눌러 동의하세요.</div>
+    </div>`;
+  }
+  const warn = HF_USER && HF_USER.invalid ? "저장된 토큰이 <b>만료/무효</b>입니다 — 새 토큰으로 로그인하세요." : "게이트 모델은 로그인이 필요합니다.";
+  return `<div class="auth-box">
+    <div class="hint" style="margin-bottom:6px">🔒 ${warn}</div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input id="hfToken" type="password" placeholder="HF 토큰 (hf_...) 붙여넣기" autocomplete="off" spellcheck="false" style="flex:1;background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px">
+      <button class="btn small" onclick="hfLogin()">로그인</button>
+    </div>
+    <div style="display:flex;gap:12px;font-size:12px">
+      <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noreferrer" style="color:var(--accent)">① 토큰 발급(read) ↗</a>
+      ${licLink}
+    </div>
+    <div class="hint" style="margin-top:4px">한 번 로그인하면 저장돼서 이후엔 자동으로 쓰입니다.</div>
+  </div>`;
+}
+window.hfLogin = async () => {
   const el = $("hfToken");
   const v = el ? el.value.trim() : "";
   const hint = $("instHint");
   if (!v) return;
+  if (hint) hint.textContent = "로그인 중…";
   try {
-    await postJSON("/api/env", { key: "HF_TOKEN", value: v });
+    const r = await postJSON("/api/hf/login", { token: v });
     if (el) el.value = "";
-    if (hint) hint.innerHTML = '<span style="color:var(--good)">토큰 저장됨 ✅ — 라이선스 동의(②) 후 설치를 누르세요</span>';
+    HF_USER = { logged_in: true, name: r.name };
+    if (hint) hint.innerHTML = '<span style="color:var(--good)">로그인됨 ✅ ' + escapeHtml(r.name || "") + ' — 라이선스 동의 후 설치</span>';
+    updateReadyUI();
   } catch (e) {
-    if (hint) hint.textContent = "토큰 저장 실패: " + e.message;
+    if (hint) hint.innerHTML = '<span style="color:var(--bad)">로그인 실패 — 토큰 확인(read 권한)</span>';
   }
-};
-window.openLicense = () => {
-  const r = $("fluxRepo");
-  const repo = r ? r.value : "black-forest-labs/FLUX.1-dev";
-  window.open("https://huggingface.co/" + repo, "_blank");
 };
 
 window.runInstall = async (name, repoArg) => {
