@@ -15,17 +15,43 @@ from diffusers import AutoPipelineForText2Image
 repo_l = job["repo"].lower()
 fast = ("turbo" in repo_l) or ("schnell" in repo_l) or ("lightning" in repo_l)
 dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-pipe = AutoPipelineForText2Image.from_pretrained(job["repo"], torch_dtype=dtype)
 
-# VRAM 되면 GPU 직접(빠름), OOM이면 CPU 오프로드 폴백(FLUX 등 대형)
+
+def _repo_cache_gb(repo):
+    try:
+        from huggingface_hub import scan_cache_dir
+        for r in scan_cache_dir().repos:
+            if r.repo_id.lower() == repo.lower():
+                return r.size_on_disk / 1e9
+    except Exception:
+        pass
+    return None
+
+
+# 안전장치: 모델 크기 vs 여유 VRAM 비교 → 대형이면 CPU 오프로드(크래시 방지)
+size_gb = _repo_cache_gb(job["repo"])
+free_gb = torch.cuda.mem_get_info()[0] / 1e9 if torch.cuda.is_available() else 0
+use_offload = bool(size_gb and free_gb and size_gb * 1.15 > free_gb)
+print("모델 ~%.1fGB / 여유 VRAM ~%.1fGB → %s" % (
+    size_gb or -1, free_gb, "CPU 오프로드(안전·느림)" if use_offload else "GPU 직접(빠름)"), flush=True)
+
+pipe = AutoPipelineForText2Image.from_pretrained(job["repo"], torch_dtype=dtype)
 offloaded = False
 if torch.cuda.is_available():
-    try:
-        pipe.to("cuda")
-        print("GPU 직접 로드", flush=True)
-    except RuntimeError:
+    if use_offload:
         pipe.enable_model_cpu_offload(); offloaded = True
-        print("VRAM 부족 → CPU 오프로드(느림)", flush=True)
+    else:
+        try:
+            pipe.to("cuda")
+        except RuntimeError:
+            pipe.enable_model_cpu_offload(); offloaded = True
+            print("VRAM 부족 → CPU 오프로드로 전환", flush=True)
+# 메모리 절약 (OOM 크래시 방지)
+for _m in ("enable_attention_slicing", "enable_vae_slicing", "enable_vae_tiling"):
+    try:
+        getattr(pipe, _m)()
+    except Exception:
+        pass
 try:
     pipe.set_progress_bar_config(disable=True)
 except Exception:
