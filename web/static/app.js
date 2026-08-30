@@ -157,6 +157,27 @@ function renderAll() {
 }
 
 // a→z 지도: 준비 → 제작 → 배치 → 완료 로 묶어서 표시
+// 제작~export: 웹이 아니라 Claude+언리얼 MCP가 실행하는 단계
+const CLAUDE_STEPS = new Set(["make", "ue_import", "place", "dusk", "export"]);
+function claudeHandoff() {
+  const msg = `이 VR 프로젝트를 진행해줘.\n` +
+    `- 계약서: vr-harness/web/AGENT_CONTRACT.md\n` +
+    `- 상태: vr-harness/web/projects/${PID}/state.json (주제·배경·앵커·에셋·엔진 확정됨)\n` +
+    `웹에서 게이트 확정은 끝났으니, 확정된 값으로 [에셋 제작(이미지→3D) → 언리얼 임포트 → 배치 → 노을 → export]를 수행해줘. 언리얼 에디터+MCP는 임포트 전에 켤게.`;
+  return `<div class="handoff">
+    <div class="hh-title">🤖 이 단계는 <b>Claude + 언리얼 MCP</b>가 실행합니다 (웹은 준비·확정 담당)</div>
+    <div class="hint" style="margin:6px 0">웹에서 <b>환경·주제·앵커·에셋</b>을 확정했다면, 아래 지시문을 <b>Claude Code에 붙여넣어</b> 실행하세요.</div>
+    <pre class="hh-msg" id="handoffMsg">${escapeHtml(msg)}</pre>
+    <button class="btn small" onclick="copyHandoff()">📋 지시문 복사</button>
+    <span class="hint" id="handoffCopied" style="margin-left:8px"></span>
+  </div>`;
+}
+window.copyHandoff = async () => {
+  const el = $("handoffMsg"); if (!el) return;
+  try { await navigator.clipboard.writeText(el.textContent); const c = $("handoffCopied"); if (c) c.textContent = "복사됨 ✓"; }
+  catch (e) { const c = $("handoffCopied"); if (c) c.textContent = "복사 실패 — 수동 선택"; }
+};
+
 const FLOW_GROUPS = [
   { k: "준비", ids: ["env", "topic", "anchor", "assets"] },
   { k: "제작", ids: ["make"] },
@@ -242,6 +263,11 @@ function renderCenter() {
   // 단계 도움말 (빈 종이 막막함 완화)
   if (s.help && !locked) {
     html += `<div class="step-help">💡 ${escapeHtml(s.help)}</div>`;
+  }
+
+  // 제작 단계(Claude+MCP가 실행) — 웹은 준비만
+  if (CLAUDE_STEPS.has(s.id) && !locked) {
+    html += claudeHandoff();
   }
 
   // 입력 필드
