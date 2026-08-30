@@ -13,6 +13,9 @@ let DIAG_DONE = false;  // 이번 프로젝트에서 진단을 한 번이라도 
 let DOC_FULL = "";     // 현재 문서 전체 텍스트 (더보기 모달용)
 let DOC_REF = "";      // 현재 문서 ref
 let COLLAPSED = {};    // 스테이지 접힘 상태(사용자 토글). 없으면 '완료 시 접힘' 기본
+let AUTO_INSTALL = new Set();  // 그 자리 설치 가능한 항목
+let WINGET = false;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // 스크롤 위치 보존(재렌더 시 위로 튀는 것 방지)
 function keepScroll(fn) {
@@ -46,6 +49,7 @@ const postJSON = (url, body) =>
 async function init() {
   [FLOW, ENGINES] = await Promise.all([api("/api/flow"), api("/api/engines")]);
   try { EXAMPLES = (await api("/api/examples")).examples || []; } catch (e) { EXAMPLES = []; }
+  try { const a = await api("/api/install/available"); AUTO_INSTALL = new Set(a.items || []); WINGET = !!a.winget; } catch (e) {}
 
   $("newProjectBtn").onclick = onNewProject;
   $("editFlowBtn").onclick = openFlowEditor;
@@ -611,9 +615,45 @@ window.openGuide = (name) => {
   const data = window._diagData || {};
   const item = (data.items || []).find((i) => i.name === name);
   const g = (item && item.guide) ? item.guide : "설치 가이드가 없습니다.";
-  $("docModalTitle").textContent = "🛠 설치 가이드 — " + name;
-  $("docModalBody").innerHTML = mdToHtml(g);
+  $("docModalTitle").textContent = "🛠 설치 — " + name;
+  let extra = "";
+  if (AUTO_INSTALL.has(name)) {
+    const wingetItem = /node|git|Blender/i.test(name);
+    const warn = (wingetItem && !WINGET) ? " (winget 미설치 — 아래 수동 가이드 이용)" : "";
+    extra = `<div class="inst-box">
+      <button class="btn gate" id="instBtn" onclick="runInstall('${escapeAttr(name)}')" ${(wingetItem && !WINGET) ? "disabled" : ""}>⚡ 지금 설치</button>
+      <span class="hint" id="instHint" style="margin-left:8px">이 자리에서 바로 설치합니다${warn}</span>
+      <pre id="instLog" class="inst-log" style="display:none"></pre>
+    </div>`;
+  }
+  $("docModalBody").innerHTML = extra + mdToHtml(g);
   $("docOverlay").classList.add("open");
+};
+
+window.runInstall = async (name) => {
+  const btn = $("instBtn"), hint = $("instHint"), log = $("instLog");
+  if (btn) btn.disabled = true;
+  if (hint) hint.textContent = "설치 시작…";
+  if (log) { log.style.display = "block"; log.textContent = ""; }
+  try { await postJSON("/api/install", { item: name }); }
+  catch (e) { if (hint) hint.textContent = "설치 시작 실패: " + e.message; if (btn) btn.disabled = false; return; }
+  while (true) {
+    await sleep(1500);
+    let s;
+    try { s = await api("/api/install/status?item=" + encodeURIComponent(name)); } catch (e) { continue; }
+    if (log) { log.textContent = (s.lines || []).join("\n"); log.scrollTop = log.scrollHeight; }
+    if (!s.running && s.code !== null && s.code !== undefined) {
+      if (s.code === 0) {
+        if (hint) hint.innerHTML = '<span style="color:var(--good)">설치 완료 ✅ — 재진단 중…</span>';
+        await runDiagnose();
+        keepScroll(() => renderCenter());
+      } else {
+        if (hint) hint.innerHTML = '<span style="color:var(--bad)">실패(코드 ' + s.code + ') — 로그 확인 후 수동 가이드</span>';
+        if (btn) btn.disabled = false;
+      }
+      break;
+    }
+  }
 };
 
 function openDocModal() {

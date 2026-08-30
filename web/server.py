@@ -20,6 +20,8 @@ import os
 import sys
 import time
 import threading
+import subprocess
+import shutil
 import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, unquote
@@ -40,6 +42,52 @@ PROJECTS_DIR = os.path.join(BASE, "projects")
 _lock = threading.Lock()
 # 프로젝트별 상태 버전 (SSE 가 이 값 변화를 감지해 푸시)
 _versions = {}
+
+# ---------- 그 자리 설치 (화이트리스트만) ----------
+# 안전: 미리 정의된 명령만 실행. CUDA/UE 등 무거운 GUI 설치는 제외(가이드만).
+_PYEXE = [sys.executable] if sys.executable else ["py", "-3"]
+INSTALL_CMDS = {
+    "uv": [_PYEXE + ["-m", "pip", "install", "-U", "uv"]],
+    "PyTorch (GPU)": [_PYEXE + ["-m", "pip", "install", "torch",
+                                "--index-url", "https://download.pytorch.org/whl/cu121"]],
+    "FLUX.2 모델 (로컬)": [_PYEXE + ["-m", "pip", "install", "-U",
+                                  "diffusers", "transformers", "accelerate", "huggingface_hub"]],
+    "node": [["winget", "install", "-e", "--id", "OpenJS.NodeJS.LTS",
+              "--accept-package-agreements", "--accept-source-agreements"]],
+    "git": [["winget", "install", "-e", "--id", "Git.Git",
+             "--accept-package-agreements", "--accept-source-agreements"]],
+    "Blender (선택·분석)": [["winget", "install", "-e", "--id", "BlenderFoundation.Blender",
+                          "--accept-package-agreements", "--accept-source-agreements"]],
+}
+INSTALL_STATE = {}          # item -> {"running":bool, "code":int|None, "lines":[...]}
+_install_lock = threading.Lock()
+
+
+def _run_install(item, cmds):
+    st = INSTALL_STATE[item]
+    try:
+        for cmd in cmds:
+            st["lines"].append("$ " + " ".join(cmd))
+            try:
+                p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                     text=True, encoding="utf-8", errors="replace")
+            except FileNotFoundError:
+                st["lines"].append("실행기 없음: %s (수동 설치 필요)" % cmd[0])
+                st["code"] = -1
+                return
+            for line in p.stdout:
+                st["lines"].append(line.rstrip())
+                del st["lines"][:-500]   # 최근 500줄만 보관
+            p.wait()
+            if p.returncode != 0:
+                st["code"] = p.returncode
+                return
+        st["code"] = 0
+    except Exception as e:
+        st["lines"].append("ERROR: " + repr(e))
+        st["code"] = -1
+    finally:
+        st["running"] = False
 
 
 # ---------- 유틸 ----------
@@ -233,6 +281,17 @@ class Handler(BaseHTTPRequestHandler):
             if st is None:
                 return self._json({"error": "no project"}, 404)
             return self._json(st)
+        if p == "/api/install/status":
+            item = (q.get("item", [""])[0]) or ""
+            st = INSTALL_STATE.get(item)
+            if not st:
+                return self._json({"running": False, "code": None, "lines": []})
+            return self._json({"running": st["running"], "code": st["code"],
+                               "lines": st["lines"][-120:]})
+        if p == "/api/install/available":
+            # 그 자리 설치 가능한 항목 목록 (프론트가 '지금 설치' 버튼 노출 판단)
+            names = list(INSTALL_CMDS.keys())
+            return self._json({"items": names, "winget": bool(shutil.which("winget"))})
         if p == "/api/diagnose/spec":
             if diag is None:
                 return self._json({"error": "diag 모듈 로드 실패"}, 500)
@@ -273,6 +332,19 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         p = u.path
         body = self._body_json()
+
+        if p == "/api/install":
+            item = body.get("item")
+            cmds = INSTALL_CMDS.get(item)
+            if not cmds:
+                return self._json({"error": "그 자리 설치 미지원 항목(수동 설치)"}, 400)
+            with _install_lock:
+                cur = INSTALL_STATE.get(item)
+                if cur and cur.get("running"):
+                    return self._json({"started": True, "already": True})
+                INSTALL_STATE[item] = {"running": True, "code": None, "lines": []}
+            threading.Thread(target=_run_install, args=(item, cmds), daemon=True).start()
+            return self._json({"started": True})
 
         if p == "/api/env":
             # 허용 키만 web/.env 에 저장 (값은 반환/로그 안 함)
