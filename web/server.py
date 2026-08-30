@@ -63,6 +63,72 @@ INSTALL_CMDS = {
 INSTALL_STATE = {}          # item -> {"running":bool, "code":int|None, "lines":[...]}
 _install_lock = threading.Lock()
 
+# 강도 스펙트럼 4장 생성 (선택 엔진: gpt-image=클라우드 / 그 외=로컬 diffusers)
+SPECTRUM_STATE = {"running": False, "images": None, "error": None, "log": []}
+_INTENS = [
+    ("은은", "은은하고 낮은 대비, 뮤트 파스텔, 부드러운 빛, subtle muted low-contrast"),
+    ("중간", "자연스러운 사실적 톤, 보통 대비와 채도, natural realistic"),
+    ("뚜렷", "선명하고 높은 대비, 진한 색, 뚜렷한 그림자, vivid high-contrast bold"),
+    ("하이", "강렬한 하이톤, 과장된 대비·채도, 극적 조명·발광, hyper vivid dramatic glowing"),
+]
+
+
+def _spectrum_prompt(topic, bg, style):
+    return "%s, %s, %s. 하나의 일관된 장면, 디지털 콘셉트 아트." % (topic, bg, style)
+
+
+def _run_spectrum(engine, repo, topic, bg):
+    st = SPECTRUM_STATE
+    st["images"], st["error"], st["log"] = None, None, []
+    try:
+        if engine and "gpt-image" in engine.lower():
+            key = _openai_key()
+            if not key:
+                st["error"] = "OpenAI 키 필요"; return
+            imgs = []
+            for name, style in _INTENS:
+                st["log"].append("gpt-image 생성: " + name)
+                rb = json.dumps({"model": "gpt-image-1", "prompt": _spectrum_prompt(topic, bg, style),
+                                 "size": "1024x1024", "quality": "low", "n": 1}).encode()
+                req = _urlreq.Request("https://api.openai.com/v1/images/generations", data=rb,
+                                      headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
+                out = json.load(_urlreq.urlopen(req, timeout=120))
+                imgs.append({"name": name, "b64": out["data"][0]["b64_json"]})
+            st["images"] = imgs
+        else:
+            # 로컬 diffusers 생성
+            if not repo:
+                st["error"] = "로컬 모델(repo) 미선택"; return
+            steps = 4 if "schnell" in repo.lower() else 25
+            outp = os.path.join(BASE, "projects", "_spectrum_out.json")
+            jobp = os.path.join(BASE, "projects", "_spectrum_job.json")
+            job = {"repo": repo, "steps": steps, "size": 768, "out": outp,
+                   "prompts": [{"name": n, "prompt": _spectrum_prompt(topic, bg, s)} for n, s in _INTENS]}
+            os.makedirs(os.path.dirname(jobp), exist_ok=True)
+            with open(jobp, "w", encoding="utf-8") as f:
+                json.dump(job, f, ensure_ascii=False)
+            try:
+                os.remove(outp)
+            except OSError:
+                pass
+            env = os.environ.copy(); env.update(_load_env_vars())
+            cmd = _PYEXE + [os.path.join(BASE, "gen_spectrum.py"), jobp]
+            st["log"].append("$ " + " ".join(cmd))
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                 text=True, encoding="utf-8", errors="replace", env=env)
+            for line in p.stdout:
+                st["log"].append(line.rstrip())
+                del st["log"][:-400]
+            p.wait()
+            if p.returncode == 0 and os.path.exists(outp):
+                st["images"] = json.load(open(outp, encoding="utf-8"))["images"]
+            else:
+                st["error"] = "로컬 생성 실패(코드 %s) — 로그 확인" % p.returncode
+    except Exception as e:
+        st["error"] = str(e)[:200]
+    finally:
+        st["running"] = False
+
 
 def _openai_key():
     for p in [os.path.join(BASE, ".env"),
@@ -346,6 +412,10 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 pass
             return self._json({"repo": repo, "present": present, "size": size})
+        if p == "/api/spectrum/status":
+            st = SPECTRUM_STATE
+            return self._json({"running": st["running"], "images": st["images"],
+                               "error": st["error"], "log": st["log"][-40:]})
         if p == "/api/install/status":
             item = (q.get("item", [""])[0]) or ""
             st = INSTALL_STATE.get(item)
@@ -400,31 +470,17 @@ class Handler(BaseHTTPRequestHandler):
         body = self._body_json()
 
         if p == "/api/spectrum":
-            key = _openai_key()
-            if not key:
-                return self._json({"error": "OpenAI 키 필요 — 1단계에서 저장"}, 400)
-            topic = body.get("topic", ""); bg = body.get("background", "")
-            if not topic:
+            if not body.get("topic"):
                 return self._json({"error": "먼저 주제를 입력하세요"}, 400)
-            intens = [
-                ("은은", "은은하고 낮은 대비, 뮤트 파스텔, 부드러운 빛, subtle muted low-contrast"),
-                ("중간", "자연스러운 사실적 톤, 보통 대비와 채도, natural realistic"),
-                ("뚜렷", "선명하고 높은 대비, 진한 색, 뚜렷한 그림자, vivid high-contrast bold"),
-                ("하이", "강렬한 하이톤, 과장된 대비·채도, 극적 조명·발광, hyper vivid dramatic glowing"),
-            ]
-            images = []
-            for name, style in intens:
-                prompt = "%s, %s, %s. 하나의 일관된 장면, 디지털 콘셉트 아트." % (topic, bg, style)
-                rb = json.dumps({"model": "gpt-image-1", "prompt": prompt,
-                                 "size": "1024x1024", "quality": "low", "n": 1}).encode()
-                req = _urlreq.Request("https://api.openai.com/v1/images/generations", data=rb,
-                                      headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
-                try:
-                    out = json.load(_urlreq.urlopen(req, timeout=120))
-                    images.append({"name": name, "b64": out["data"][0]["b64_json"]})
-                except Exception as e:
-                    return self._json({"error": "'%s' 생성 실패: %s" % (name, str(e)[:120])}, 500)
-            return self._json({"images": images})
+            with _install_lock:
+                if SPECTRUM_STATE.get("running"):
+                    return self._json({"started": True, "already": True})
+                SPECTRUM_STATE.update({"running": True, "images": None, "error": None, "log": []})
+            engine = body.get("engine", ""); repo = body.get("repo", "")
+            threading.Thread(target=_run_spectrum,
+                             args=(engine, repo, body.get("topic", ""), body.get("background", "")),
+                             daemon=True).start()
+            return self._json({"started": True, "mode": ("cloud" if "gpt-image" in (engine or "").lower() else "local")})
 
         if p == "/api/suggest-anchor":
             key = _openai_key()

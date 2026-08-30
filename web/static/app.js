@@ -355,25 +355,45 @@ window.setAnchor = async (name) => {
   document.querySelectorAll(".spec-card").forEach((el) => el.classList.toggle("on", el.dataset.name === name));
   renderFlowList(); updateGateButtons();
 };
+function renderSpecImages(images) {
+  const box = $("spectrumImgs"); if (!box) return;
+  const cur = (STATE.inputs || {}).anchor || "";
+  box.innerHTML = (images || []).map((im) =>
+    `<button class="spec-card ${cur === im.name ? "on" : ""}" data-name="${im.name}" onclick="setAnchor('${im.name}')">
+      <img src="data:image/png;base64,${im.b64}" alt="${escapeAttr(im.name)}">
+      <span class="spec-name">${escapeHtml(im.name)}</span>
+    </button>`).join("");
+}
 window.genSpectrum = async (btn) => {
   const inp = STATE.inputs || {};
+  const ec = STATE.engine_choices || {};
   const box = $("spectrumImgs");
-  if (btn) { btn.disabled = true; btn.textContent = "🖼 생성 중… (수십 초)"; }
-  if (box) box.innerHTML = `<span class="hint">gpt-image로 4장 생성 중… 잠시만요</span>`;
+  const engine = ec.image || "";
+  const repo = ec.image_repo || "";
+  const isCloud = /gpt-image/i.test(engine);
+  if (!isCloud && !repo) {
+    if (box) box.innerHTML = `<span class="hint" style="color:var(--warn)">로컬 모델을 먼저 선택하세요 (2단계 이미지 엔진 → 모델).</span>`;
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = "🖼 생성 중…"; }
+  if (box) box.innerHTML = `<span class="hint">${isCloud ? "gpt-image로 생성 중…" : "로컬(" + escapeHtml(repo) + ")로 생성 중… 모델 로딩 포함, 몇 분 걸릴 수 있어요"}</span><pre id="specLog" class="inst-log" style="display:block"></pre>`;
   try {
-    const d = await postJSON("/api/spectrum", { topic: inp.topic || "", background: inp.background || "" });
-    if (d.error) {
-      if (box) box.innerHTML = `<span class="hint" style="color:var(--warn)">${escapeHtml(d.error)}</span>`;
-    } else {
-      const cur = (STATE.inputs || {}).anchor || "";
-      box.innerHTML = (d.images || []).map((im) =>
-        `<button class="spec-card ${cur === im.name ? "on" : ""}" data-name="${im.name}" onclick="setAnchor('${im.name}')">
-          <img src="data:image/png;base64,${im.b64}" alt="${escapeAttr(im.name)}">
-          <span class="spec-name">${escapeHtml(im.name)}</span>
-        </button>`).join("");
+    const s = await postJSON("/api/spectrum", { topic: inp.topic || "", background: inp.background || "", engine, repo });
+    if (s.error) throw new Error(s.error);
+    // 폴링
+    while (true) {
+      await sleep(1800);
+      let st;
+      try { st = await api("/api/spectrum/status"); } catch (e) { continue; }
+      const lg = $("specLog"); if (lg) { lg.textContent = (st.log || []).join("\n"); lg.scrollTop = lg.scrollHeight; }
+      if (!st.running) {
+        if (st.images) { renderSpecImages(st.images); }
+        else if (box) box.innerHTML = `<span class="hint" style="color:var(--bad)">생성 실패: ${escapeHtml(st.error || "")}</span>`;
+        break;
+      }
     }
   } catch (e) {
-    if (box) box.innerHTML = `<span class="hint" style="color:var(--bad)">생성 실패: ${e.message}</span>`;
+    if (box) box.innerHTML = `<span class="hint" style="color:var(--bad)">생성 실패: ${escapeHtml(e.message)}</span>`;
   }
   if (btn) { btn.disabled = false; btn.textContent = "🖼 다시 생성"; }
 };
