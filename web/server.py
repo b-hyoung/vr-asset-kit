@@ -50,8 +50,6 @@ INSTALL_CMDS = {
     "uv": [_PYEXE + ["-m", "pip", "install", "-U", "uv"]],
     "PyTorch (GPU)": [_PYEXE + ["-m", "pip", "install", "torch",
                                 "--index-url", "https://download.pytorch.org/whl/cu121"]],
-    "FLUX.2 모델 (로컬)": [_PYEXE + ["-m", "pip", "install", "-U",
-                                  "diffusers", "transformers", "accelerate", "huggingface_hub"]],
     "node": [["winget", "install", "-e", "--id", "OpenJS.NodeJS.LTS",
               "--accept-package-agreements", "--accept-source-agreements"]],
     "git": [["winget", "install", "-e", "--id", "Git.Git",
@@ -302,6 +300,18 @@ class Handler(BaseHTTPRequestHandler):
             if st is None:
                 return self._json({"error": "no project"}, 404)
             return self._json(st)
+        if p == "/api/hf/present":
+            repo = (q.get("repo", [""])[0]) or ""
+            present, size = False, None
+            try:
+                from huggingface_hub import scan_cache_dir
+                for r in scan_cache_dir().repos:
+                    if r.repo_id.lower() == repo.lower():
+                        present, size = True, round(r.size_on_disk / 1e9, 1)
+                        break
+            except Exception:
+                pass
+            return self._json({"repo": repo, "present": present, "size": size})
         if p == "/api/install/status":
             item = (q.get("item", [""])[0]) or ""
             st = INSTALL_STATE.get(item)
@@ -323,7 +333,8 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 hd = (q.get("hunyuan_dir", [None])[0]) or None
                 ef = (q.get("env_file", [None])[0]) or None
-                return self._json(diag.run(hunyuan_dir=hd, env_file=ef))
+                ir = (q.get("image_repo", [None])[0]) or None
+                return self._json(diag.run(hunyuan_dir=hd, env_file=ef, image_repo=ir))
             except Exception as e:
                 return self._json({"error": "진단 실패: %r" % e}, 500)
         if p == "/api/doc":
@@ -356,20 +367,19 @@ class Handler(BaseHTTPRequestHandler):
 
         if p == "/api/install":
             item = body.get("item")
-            if item == "FLUX.2 모델 (로컬)":
-                # 선택한 FLUX 모델(화이트리스트)까지 다운로드
-                FLUX_REPOS = {"black-forest-labs/FLUX.2-dev",
-                              "black-forest-labs/FLUX.1-dev",
-                              "black-forest-labs/FLUX.1-schnell"}
-                repo = body.get("repo") or "black-forest-labs/FLUX.2-dev"
-                if repo not in FLUX_REPOS:
-                    return self._json({"error": "허용되지 않은 모델"}, 400)
+            repo = body.get("repo")
+            if repo:
+                # 임의 HF 모델 다운로드 (repo id 패턴 검증 — org/name)
+                import re
+                if not re.match(r"^[A-Za-z0-9._\-]+/[A-Za-z0-9._\-]+$", repo):
+                    return self._json({"error": "잘못된 모델 id (org/name 형식)"}, 400)
                 cmds = [
                     _PYEXE + ["-m", "pip", "install", "-U", "diffusers", "transformers",
                               "accelerate", "huggingface_hub"],
                     _PYEXE + ["-c", "from huggingface_hub import snapshot_download; "
                               "snapshot_download('%s'); print('DONE %s')" % (repo, repo)],
                 ]
+                item = item or ("model:" + repo)   # 상태 키
             else:
                 cmds = INSTALL_CMDS.get(item)
             if not cmds:

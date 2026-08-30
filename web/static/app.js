@@ -440,10 +440,16 @@ function buildDiagStages(data, pending) {
   return h + `</div>`;
 }
 
-// 이미지 엔진 선택 (진단 후, 하나 확정)
+// 이미지 엔진 선택 + 로컬 모델(프리셋/커스텀) 설치
+const FLUX_PRESETS = [
+  "black-forest-labs/FLUX.1-schnell",
+  "black-forest-labs/FLUX.1-dev",
+  "black-forest-labs/FLUX.2-dev",
+];
 function imageChooser() {
   const choices = (ENGINES.roles && ENGINES.roles.image && ENGINES.roles.image.choices) || [];
   const cur = (STATE.engine_choices || {}).image || "";
+  const repo = (STATE.engine_choices || {}).image_repo || "";
   let h = `<div class="img-choose"><div class="ic-h">이미지 엔진 — 하나를 눌러 확정</div>`;
   for (const c of choices) {
     const needKey = /gpt-image/i.test(c);
@@ -451,17 +457,70 @@ function imageChooser() {
     h += `<button class="img-opt ${on ? "on" : ""}" onclick="chooseImageEngine('${escapeAttr(c)}')">
       <span class="io-dot">${on ? "●" : "○"}</span><span class="io-name">${escapeHtml(c)}</span>${needKey ? '<span class="io-tag key">🔑 키필요</span>' : '<span class="io-tag local">로컬</span>'}</button>`;
   }
+
+  // 로컬 엔진: 모델 선택(프리셋/커스텀) + 설치
+  if (cur && !/gpt-image/i.test(cur)) {
+    h += `<div class="model-pick">`;
+    if (/flux/i.test(cur)) {
+      h += `<div class="hint" style="margin-bottom:4px">FLUX 모델 선택:</div><select id="imgRepoSel" onchange="setImageRepo(this.value)">
+        <option value="">— 선택 —</option>` +
+        FLUX_PRESETS.map((p) => `<option value="${p}" ${p === repo ? "selected" : ""}>${p.split("/")[1]}</option>`).join("") +
+        `</select>`;
+    } else {
+      h += `<div class="hint" style="margin-bottom:4px">HF 모델 id (org/name):</div>
+        <div style="display:flex;gap:6px">
+          <input id="imgRepoInput" value="${escapeAttr(repo)}" placeholder="예: stabilityai/stable-diffusion-3.5-large" style="flex:1;background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px">
+          <button class="btn small" onclick="setImageRepo((document.getElementById('imgRepoInput')||{}).value)">설정</button>
+        </div>`;
+    }
+    if (repo) {
+      const it = DIAG && (DIAG.items || []).find((i) => i.name === "이미지 모델 (로컬)");
+      const ok = !!(it && it.ok);
+      h += `<div class="ic-status ${ok ? "ok" : "wait"}" style="margin-top:8px">${ok ? "✓ 모델 있음: " + escapeHtml(repo) : "미다운로드: " + escapeHtml(repo)}</div>`;
+      if (!ok) {
+        h += `<button class="btn gate" style="margin-top:6px" onclick="installImageModel()">⚡ 이 모델 설치(다운로드)</button>
+          <div class="auth-box" style="margin-top:8px">
+            <div class="hint" style="margin-bottom:6px">🔒 게이트 모델이면 토큰+동의 필요</div>
+            <div style="display:flex;gap:6px;margin-bottom:6px">
+              <input id="hfToken" type="password" placeholder="HF 토큰 (hf_...)" autocomplete="off" spellcheck="false" style="flex:1;background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px">
+              <button class="btn small" onclick="saveHfToken()">토큰 저장</button>
+            </div>
+            <div style="display:flex;gap:12px;font-size:12px">
+              <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noreferrer" style="color:var(--accent)">① 토큰 발급 ↗</a>
+              <a href="#" onclick="window.open('https://huggingface.co/' + encodeURIComponent('${escapeAttr(repo)}'));return false" style="color:var(--accent)">② 라이선스 동의 ↗</a>
+            </div>
+          </div>
+          <span class="hint" id="instHint" style="display:block;margin-top:6px"></span>
+          <pre id="instLog" class="inst-log"></pre>`;
+      }
+    }
+    h += `</div>`;
+  }
+
+  // gpt-image 키
   if (/gpt-image/i.test(cur) && !openaiKeyOk()) {
     h += `<div class="key-row">
       <input id="openaiKeyInput" type="password" placeholder="OPENAI_API_KEY 붙여넣기" autocomplete="off" spellcheck="false">
       <button class="btn small" onclick="saveOpenAIKey()">키 저장(.env)</button>
     </div><div class="hint" style="color:var(--warn);margin-top:4px">gpt-image는 키가 있어야 확정됩니다.</div>`;
   }
+
   const msg = !cur ? "아직 미선택 — 하나를 눌러 확정하세요"
-    : (imageEngineReady() ? `✓ '${escapeHtml(cur)}' 확정 준비됨` : "키 입력 후 확정 가능");
+    : (imageEngineReady() ? `✓ '${escapeHtml(cur)}' 확정 준비됨` : "모델 다운로드/키 후 확정 가능");
   h += `<div class="ic-status ${!cur ? "wait" : (imageEngineReady() ? "ok" : "wait")}">${msg}</div>`;
   return h + `</div>`;
 }
+window.setImageRepo = async (v) => {
+  v = (v || "").trim();
+  if (!v) return;
+  STATE = await postJSON(`/api/projects/${PID}/engine`, { key: "image_repo", value: v });
+  await runDiagnose();               // 선택 모델 존재 여부 재확인
+  keepScroll(() => renderCenter());
+};
+window.installImageModel = () => {
+  const repo = (STATE.engine_choices || {}).image_repo;
+  if (repo) runInstall("이미지 모델 (로컬)", repo);
+};
 function openaiKeyOk() {
   const item = DIAG && (DIAG.items || []).find((i) => i.name === "OPENAI_API_KEY");
   return !!(item && item.ok);
@@ -470,8 +529,9 @@ function imageEngineReady() {
   const ch = (STATE.engine_choices || {}).image;
   if (!ch) return false;
   if (/gpt-image/i.test(ch)) return openaiKeyOk();
-  // 로컬 엔진 = 실제 모델이 다운로드돼 있어야 준비됨 (진단의 FLUX 모델 항목)
-  const it = DIAG && (DIAG.items || []).find((i) => i.name === "FLUX.2 모델 (로컬)");
+  // 로컬 엔진 = 선택한 모델(repo)이 실제로 받아져 있어야 준비됨
+  if (!(STATE.engine_choices || {}).image_repo) return false;
+  const it = DIAG && (DIAG.items || []).find((i) => i.name === "이미지 모델 (로컬)");
   return !!(it && it.ok);
 }
 window.chooseImageEngine = async (v) => {
@@ -562,7 +622,8 @@ window.runDiagnose = async () => {
   if (stat) stat.innerHTML = `<span style="color:var(--accent)">진단중…</span>`;
   if (res) res.innerHTML = "";
   try {
-    const d = await api("/api/diagnose");
+    const ir = (STATE && STATE.engine_choices && STATE.engine_choices.image_repo) || "";
+    const d = await api("/api/diagnose" + (ir ? "?image_repo=" + encodeURIComponent(ir) : ""));
     DIAG = d; DIAG_DONE = true;
     paintDiag(d);
     updateGateButtons();  // 진단 완료 → 게이트 버튼 활성화
@@ -624,33 +685,9 @@ window.openGuide = (name) => {
   if (AUTO_INSTALL.has(name)) {
     const wingetItem = /node|git|Blender/i.test(name);
     const warn = (wingetItem && !WINGET) ? " (winget 미설치 — 아래 수동 가이드 이용)" : "";
-    const isFlux = name === "FLUX.2 모델 (로컬)";
-    const modelSel = isFlux ? `<div style="margin-bottom:8px">
-      <span class="hint">받을 모델 선택: </span>
-      <select id="fluxRepo" style="background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font-size:12.5px">
-        <option value="black-forest-labs/FLUX.2-dev">FLUX.2 [dev] · 최신·고화질 (~수십GB)</option>
-        <option value="black-forest-labs/FLUX.1-dev">FLUX.1 [dev] · 안정</option>
-        <option value="black-forest-labs/FLUX.1-schnell">FLUX.1 [schnell] · 빠름·가벼움</option>
-      </select></div>` : "";
-    const label = isFlux ? "⚡ 선택 모델 설치(가중치 다운로드)" : "⚡ 지금 설치";
-    const note = isFlux ? "선택한 모델 가중치를 받습니다(대용량·시간 걸림)." : `이 자리에서 바로 설치합니다${warn}`;
-    const authBox = isFlux ? `<div class="auth-box">
-      <div class="hint" style="margin-bottom:6px">🔒 <b>게이트 모델</b>입니다 — 토큰 + 라이선스 동의가 필요해요.</div>
-      <div style="display:flex;gap:6px;margin-bottom:6px">
-        <input id="hfToken" type="password" placeholder="HF 토큰 (hf_...)" autocomplete="off" spellcheck="false"
-          style="flex:1;background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px">
-        <button class="btn small" onclick="saveHfToken()">토큰 저장</button>
-      </div>
-      <div style="display:flex;gap:12px;font-size:12px">
-        <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noreferrer" style="color:var(--accent)">① 토큰 발급 ↗</a>
-        <a href="#" onclick="openLicense();return false" style="color:var(--accent)">② 이 모델 라이선스 동의 ↗</a>
-      </div>
-    </div>` : "";
     extra = `<div class="inst-box">
-      ${modelSel}
-      ${authBox}
-      <button class="btn gate" id="instBtn" onclick="runInstall('${escapeAttr(name)}')" ${(wingetItem && !WINGET) ? "disabled" : ""}>${label}</button>
-      <span class="hint" id="instHint" style="margin-left:8px">${note}</span>
+      <button class="btn gate" id="instBtn" onclick="runInstall('${escapeAttr(name)}')" ${(wingetItem && !WINGET) ? "disabled" : ""}>⚡ 지금 설치</button>
+      <span class="hint" id="instHint" style="margin-left:8px">이 자리에서 바로 설치합니다${warn}</span>
       <pre id="instLog" class="inst-log" style="display:none"></pre>
     </div>`;
   }
@@ -677,13 +714,12 @@ window.openLicense = () => {
   window.open("https://huggingface.co/" + repo, "_blank");
 };
 
-window.runInstall = async (name) => {
+window.runInstall = async (name, repoArg) => {
   const btn = $("instBtn"), hint = $("instHint"), log = $("instLog");
   if (btn) btn.disabled = true;
   if (hint) hint.textContent = "설치 시작…";
   if (log) { log.style.display = "block"; log.textContent = ""; }
-  const repoSel = $("fluxRepo");
-  const payload = repoSel ? { item: name, repo: repoSel.value } : { item: name };
+  const payload = repoArg ? { item: name, repo: repoArg } : { item: name };
   try { await postJSON("/api/install", payload); }
   catch (e) { if (hint) hint.textContent = "설치 시작 실패: " + e.message; if (btn) btn.disabled = false; return; }
   while (true) {

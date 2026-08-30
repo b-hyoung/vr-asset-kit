@@ -30,7 +30,7 @@ NAME_STAGE = {
     "python (py 포함)": "base", "node": "base", "git": "base", "uv": "base",
     "CUDA / GPU (nvidia-smi)": "base", "PyTorch (GPU)": "base",
     "Blender (선택·분석)": "base",
-    "FLUX.2 모델 (로컬)": "image", "OPENAI_API_KEY": "image",
+    "이미지 모델 (로컬)": "image", "OPENAI_API_KEY": "image",
     "Hunyuan3D-2 준비 (레포+모델)": "mesh", "RODIN_API_KEY (Hyper3D)": "mesh",
     "Unreal Engine": "unreal", "unrealclaude MCP 등록": "unreal",
     "Blender MCP 등록": "unreal",
@@ -82,15 +82,14 @@ GUIDES = {
         "*3D 생성은 Hunyuan 담당. Blender는 레퍼런스·블록아웃·검수용.*\n\n"
         "**설치**\n1. https://www.blender.org/download/ 설치\n\n"
         "**확인**\n- `C:\\Program Files\\Blender Foundation\\Blender X.X` 폴더 존재\n- Blender 실행되면 OK.",
-    "FLUX.2 모델 (로컬)":
-        "## FLUX.2 [dev] (기본 로컬 이미지)\n"
-        "**설치**\n"
-        "```\npip install -U diffusers transformers accelerate huggingface_hub\n```\n"
-        "게이트 모델이면 HF 토큰 로그인:\n```\nhf auth login\n```\n"
-        "모델 받기(또는 첫 실행 시 자동):\n```\nhf download black-forest-labs/FLUX.2-dev\n```\n"
-        "*16GB VRAM은 fp8/양자화 로드 권장.*\n\n"
-        "**확인**\n- 캐시 `~/.cache/huggingface/hub/models--black-forest-labs--FLUX.2-dev` 존재\n"
-        "```\npython -c \"from huggingface_hub import scan_cache_dir; print([r.repo_id for r in scan_cache_dir().repos])\"\n```",
+    "이미지 모델 (로컬)":
+        "## 로컬 이미지 모델 (HuggingFace)\n"
+        "이미지 엔진에서 **FLUX 프리셋** 또는 **다른 HF 모델(직접입력)**을 고르고 '이 모델 설치'로 받습니다.\n\n"
+        "**직접 설치 예 (원하면 터미널)**\n"
+        "```\npip install -U diffusers transformers accelerate huggingface_hub\nhf download <org/model>\n```\n"
+        "게이트 모델이면 토큰 필요: `hf auth login` 또는 화면의 토큰 입력.\n\n"
+        "**추천 예시 id**: black-forest-labs/FLUX.1-schnell(가벼움), stabilityai/stable-diffusion-3.5-large, Qwen/Qwen-Image\n\n"
+        "**확인**\n```\npython -c \"from huggingface_hub import scan_cache_dir; print([r.repo_id for r in scan_cache_dir().repos])\"\n```",
     "OPENAI_API_KEY":
         "## OpenAI 키 (gpt-image 쓸 때만)\n"
         "**발급**\n1. https://platform.openai.com/api-keys → **Create new secret key**\n2. 결제수단 등록(gpt-image-1은 유료)\n\n"
@@ -152,7 +151,7 @@ DEP = {
     "python (py 포함)": "always", "node": "always", "git": "always", "uv": "always",
     "Blender (선택·분석)": "always",
     "CUDA / GPU (nvidia-smi)": "local", "PyTorch (GPU)": "local",
-    "FLUX.2 모델 (로컬)": "image:local", "OPENAI_API_KEY": "image:cloud",
+    "이미지 모델 (로컬)": "image:local", "OPENAI_API_KEY": "image:cloud",
     "Hunyuan3D-2 준비 (레포+모델)": "mesh:local", "RODIN_API_KEY (Hyper3D)": "mesh:cloud",
     "Unreal Engine": "always", "unrealclaude MCP 등록": "always",
     "Blender MCP 등록": "always",
@@ -222,7 +221,7 @@ def spec():
         {"name": "git", "required": False, "need": "버전관리 (선택)"},
         {"name": "uv", "required": False, "need": "파이썬 패키지 관리 (선택)"},
         {"name": "Blender (선택·분석)", "required": False, "need": "분석·블록아웃·검수용 (생성 아님)"},
-        {"name": "FLUX.2 모델 (로컬)", "required": False, "need": "기본 이미지 엔진 — FLUX.2 [dev] diffusers (HF 캐시)"},
+        {"name": "이미지 모델 (로컬)", "required": False, "need": "로컬 이미지 엔진 모델 — 엔진에서 FLUX/커스텀 선택 후 설치"},
         {"name": "OPENAI_API_KEY", "required": False, "need": "대안 — gpt-image-1 엔진 고를 때만"},
         {"name": "Hunyuan3D-2 준비 (레포+모델)", "required": True, "need": "로컬 3D 생성 — 레포+가중치"},
         {"name": "RODIN_API_KEY (Hyper3D)", "required": False, "need": "클라우드 3D(Rodin/Hyper3D) 쓸 때만"},
@@ -235,7 +234,20 @@ def spec():
     return {"stages": STAGES, "items": _attach_meta(items)}
 
 
-def run(hunyuan_dir=None, env_file=None):
+def _hf_repo_exact(repo):
+    if not repo:
+        return None
+    try:
+        from huggingface_hub import scan_cache_dir
+        for r in scan_cache_dir().repos:
+            if r.repo_id.lower() == repo.lower():
+                return (r.repo_id, round(r.size_on_disk / 1e9, 1))
+    except Exception:
+        pass
+    return None
+
+
+def run(hunyuan_dir=None, env_file=None, image_repo=None):
     items = []
 
     def add(cat, name, ok, detail, required=False):
@@ -268,15 +280,16 @@ def run(hunyuan_dir=None, env_file=None):
     # === B. 이미지 생성 (기본 로컬, gpt-image 선택 시 OpenAI 키) ===
     B = "B. 이미지 생성"
     # 로컬 이미지: FLUX.2 [dev] diffusers 모델 (HF 캐시). 서버 없이 스크립트 실행.
-    flux_dir = os.environ.get("VRKIT_FLUX_DIR")
-    if flux_dir and os.path.isdir(flux_dir):
-        add(B, "FLUX.2 모델 (로컬)", True, "모델 폴더 지정됨: " + flux_dir, required=False)
-    else:
-        fx = _hf_repo_present("flux")   # 캐시에서 flux 계열 모델 탐지(id/위치 무관)
-        add(B, "FLUX.2 모델 (로컬)", bool(fx),
-            ("모델 있음: %s%s" % (fx[0], (" · %sGB" % fx[1]) if fx[1] else "")) if fx
-            else "모델 가중치 미다운로드 — 의존성 말고 '모델'이 필요: hf download black-forest-labs/FLUX.2-dev",
+    # 선택한 로컬 이미지 모델(repo)이 실제로 받아졌는지
+    if image_repo:
+        pr = _hf_repo_exact(image_repo)
+        add(B, "이미지 모델 (로컬)", bool(pr),
+            ("모델 있음: %s%s" % (image_repo, (" · %sGB" % pr[1]) if pr and pr[1] else "")) if pr
+            else "미다운로드: %s — 이미지 엔진 카드의 '이 모델 설치'" % image_repo,
             required=False)
+    else:
+        add(B, "이미지 모델 (로컬)", False,
+            "이미지 엔진에서 로컬 모델(FLUX 또는 커스텀)을 선택하세요", required=False)
     key_found, key_where = False, ""
     candidates = []
     if env_file:
