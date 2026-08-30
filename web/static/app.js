@@ -371,9 +371,20 @@ window.genSpectrum = async (btn) => {
   const engine = ec.image || "";
   const repo = ec.image_repo || "";
   const isCloud = /gpt-image/i.test(engine);
-  if (!isCloud && !repo) {
-    if (box) box.innerHTML = `<span class="hint" style="color:var(--warn)">로컬 모델을 먼저 선택하세요 (2단계 이미지 엔진 → 모델).</span>`;
-    return;
+  if (!isCloud) {
+    if (!repo) {
+      if (box) box.innerHTML = `<span class="hint" style="color:var(--warn)">로컬 모델을 먼저 선택하세요 (2단계 이미지 엔진 → 모델).</span>`;
+      return;
+    }
+    // 로컬 생성은 모델이 이미 다운로드돼 있어야 함
+    if (MODEL_PRESENT[repo] === undefined) { if (box) box.innerHTML = `<span class="hint">모델 확인 중…</span>`; await checkPresence(repo); }
+    if (MODEL_PRESENT[repo] !== true) {
+      if (box) box.innerHTML = `<div class="hint" style="color:var(--warn)">이 모델(<b>${escapeHtml(repo)}</b>)이 아직 다운로드되지 않았습니다.<br>
+        → <b>2단계(이미지 엔진)</b>에서 이 모델을 <b>'이 모델 설치'</b>로 먼저 받으세요.<br>
+        (게이트 모델이면 그 화면에서 <b>HF 로그인 + 라이선스 동의</b> 후 설치)<br>
+        <b>팁:</b> 로그인 없이 바로 되는 건 <code>black-forest-labs/FLUX.1-schnell</code>(비게이트).</div>`;
+      return;
+    }
   }
   if (btn) { btn.disabled = true; btn.textContent = "🖼 생성 중…"; }
   if (box) box.innerHTML = `<span class="hint">${isCloud ? "gpt-image로 생성 중…" : "로컬(" + escapeHtml(repo) + ")로 생성 중… 모델 로딩 포함, 몇 분 걸릴 수 있어요"}</span><pre id="specLog" class="inst-log" style="display:block"></pre>`;
