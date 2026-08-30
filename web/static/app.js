@@ -247,16 +247,22 @@ function renderCenter() {
       } else {
         const isLong = f === "background";
         const ph = PH[f] || "여기에 직접 입력…";
-        const ideas = (s.ideas && s.ideas[f]) || [];
-        const chips = (ideas.length && !locked)
-          ? `<div class="idea-chips">${ideas.map((t) => `<button class="idea-chip" onclick="appendIdea('${f}','${escapeAttr(t)}')">+ ${escapeHtml(t)}</button>`).join("")}</div>`
-          : "";
         html += `<div class="field"><label>${labelFor(f)}</label>` +
           (isLong
             ? `<textarea data-field="${f}" ${locked ? "disabled" : ""} placeholder="${escapeAttr(ph)}">${escapeHtml(String(val))}</textarea>`
             : `<input data-field="${f}" ${locked ? "disabled" : ""} placeholder="${escapeAttr(ph)}" value="${escapeAttr(String(val))}">`) +
-          chips + `</div>`;
+          `</div>`;
       }
+    }
+    // 아이디어 예시: 기본 접힘 (막힐 때만 펼침 — 산만함 방지)
+    if (s.ideas && !locked) {
+      let panel = "";
+      for (const f of Object.keys(s.ideas)) {
+        const chips = (s.ideas[f] || []).map((t) => `<button class="idea-chip" onclick="appendIdea('${f}','${escapeAttr(t)}')">+ ${escapeHtml(t)}</button>`).join("");
+        panel += `<div class="idea-row"><span class="idea-lbl">${labelFor(f)}</span><div class="idea-chips">${chips}</div></div>`;
+      }
+      html += `<button type="button" class="ideas-toggle" onclick="toggleIdeas(this)">💡 아이디어 예시 ▾</button>
+        <div id="ideasPanel" style="display:none">${panel}</div>`;
     }
     html += `</div>`;
   }
@@ -948,6 +954,12 @@ async function saveInput(field, value) {
   renderFlowList(); // 게이트 버튼 활성화 등 갱신
   updateGateButtons();
 }
+window.toggleIdeas = (btn) => {
+  const p = $("ideasPanel"); if (!p) return;
+  const show = p.style.display === "none";
+  p.style.display = show ? "block" : "none";
+  btn.textContent = show ? "💡 아이디어 예시 ▴" : "💡 아이디어 예시 ▾";
+};
 // 아이디어 조각 클릭 → 해당 입력칸에 이어붙임 (전체 리렌더 없이)
 window.appendIdea = async (field, text) => {
   const el = document.querySelector(`[data-field="${field}"]`);
