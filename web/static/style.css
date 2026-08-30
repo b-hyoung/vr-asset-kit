@@ -61,6 +61,14 @@ code{font-family:var(--mono);font-size:12px;background:#0c0f13;border:1px solid 
 .field label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
 .field input,.field textarea,.field select{width:100%;background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-family:inherit;font-size:13px}
 .step-help{background:#122029;border:1px solid #2b4a5a;border-radius:8px;padding:8px 12px;font-size:12.5px;color:var(--dim);margin:4px 0 10px}
+/* 강도 스펙트럼 4단계 카드 */
+.anchor-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:520px){.anchor-grid{grid-template-columns:1fr}}
+.anchor-card{text-align:left;background:#0c0f13;border:1px solid var(--line);border-radius:9px;padding:10px 12px;cursor:pointer;color:var(--dim)}
+.anchor-card:hover{border-color:var(--accent)}
+.anchor-card.on{border-color:var(--accent);background:#122029;color:var(--ink)}
+.anchor-card .ac-name{font-size:13.5px;font-weight:700;color:var(--ink);margin-bottom:3px}
+.anchor-card .ac-desc{font-size:12px;color:var(--dim);line-height:1.5}
 .ideas-toggle{margin-top:8px;background:transparent;border:none;color:var(--accent);font-size:12px;padding:2px 0;cursor:pointer}
 .idea-row{display:flex;gap:8px;align-items:flex-start;margin-top:8px}
 .idea-lbl{font-size:11px;color:var(--faint);min-width:34px;padding-top:5px}

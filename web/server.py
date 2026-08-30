@@ -399,6 +399,32 @@ class Handler(BaseHTTPRequestHandler):
         p = u.path
         body = self._body_json()
 
+        if p == "/api/suggest-anchor":
+            key = _openai_key()
+            if not key:
+                return self._json({"error": "OpenAI 키 필요 — 1단계에서 저장"}, 400)
+            topic = body.get("topic", ""); bg = body.get("background", "")
+            if not topic:
+                return self._json({"error": "먼저 주제를 입력하세요"}, 400)
+            prompt = (
+                "VR 장면. 주제: %s / 배경: %s.\n"
+                "이 장면의 스타일 '강도'를 4단계(은은/중간/뚜렷/하이)로 나눠, "
+                "각 단계가 이 장면에서 실제로 어떤 룩인지 1줄(대비·채도·조명·분위기 중심, 한국어 25자 내외)로 설명하라.\n"
+                'JSON만: {"levels":[{"name":"은은","desc":""},{"name":"중간","desc":""},{"name":"뚜렷","desc":""},{"name":"하이","desc":""}]}'
+            ) % (topic, bg)
+            reqbody = json.dumps({
+                "model": "gpt-4o-mini",
+                "messages": [{"role": "user", "content": prompt}],
+                "response_format": {"type": "json_object"}, "temperature": 0.6,
+            }).encode()
+            req = _urlreq.Request("https://api.openai.com/v1/chat/completions", data=reqbody,
+                                  headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
+            try:
+                out = json.load(_urlreq.urlopen(req, timeout=45))
+                return self._json(json.loads(out["choices"][0]["message"]["content"]))
+            except Exception as e:
+                return self._json({"error": "생성 실패: " + str(e)[:150]}, 500)
+
         if p == "/api/suggest-assets":
             key = _openai_key()
             if not key:

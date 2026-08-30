@@ -244,6 +244,8 @@ function renderCenter() {
       const val = (STATE.inputs && STATE.inputs[f] != null) ? STATE.inputs[f] : "";
       if (f === "asset_list") {
         html += renderAssetList(val, locked);
+      } else if (f === "anchor") {
+        html += `<div id="anchorWrap">${anchorChooser(locked)}</div>`;
       } else {
         const isLong = f === "background";
         const ph = PH[f] || "여기에 직접 입력…";
@@ -314,6 +316,48 @@ function renderCenter() {
   wireInputs(s, locked);
   loadDoc(s.doc_ref);
 }
+
+// 강도 스펙트럼 4단계 (은은/중간/뚜렷/하이) — 카드로 골라 앵커 확정
+const ANCHOR_LEVELS = [
+  { name: "은은", desc: "낮은 대비·뮤트 색·부드러운 빛. 잔잔하고 은은." },
+  { name: "중간", desc: "자연스러운 사실적 톤. 보통 대비·채도." },
+  { name: "뚜렷", desc: "선명·또렷. 높은 대비, 진한 색, 분명한 그림자." },
+  { name: "하이", desc: "강렬한 하이톤. 과장된 대비·채도, 극적 조명·발광." },
+];
+let ANCHOR_DESC = {};   // AI가 주제 맞춤 설명을 채우면 override
+function anchorChooser(locked) {
+  const cur = (STATE.inputs && STATE.inputs.anchor) || "";
+  let h = `<div class="field"><label>강도 스펙트럼 — 하나 선택 (= 스타일 앵커)</label>`;
+  h += `<div class="hint" style="margin-bottom:6px">이 장면을 어느 "강도"로 만들지 고르세요. 이후 모든 에셋이 이 기준을 따릅니다.</div>`;
+  h += `<div class="anchor-grid">`;
+  for (const lv of ANCHOR_LEVELS) {
+    const on = cur === lv.name;
+    const desc = ANCHOR_DESC[lv.name] || lv.desc;
+    h += `<button class="anchor-card ${on ? "on" : ""}" ${locked ? "disabled" : ""} onclick="setAnchor('${lv.name}')">
+      <div class="ac-name">${on ? "● " : ""}${lv.name}</div>
+      <div class="ac-desc">${escapeHtml(desc)}</div>
+    </button>`;
+  }
+  h += `</div>`;
+  if (!locked) h += `<button type="button" class="btn small" style="margin-top:8px" onclick="suggestAnchor(this)">🤖 이 주제에 맞춰 설명 생성</button>`;
+  return h + `</div>`;
+}
+window.setAnchor = async (name) => {
+  STATE = await postJSON(`/api/projects/${PID}/input`, { field: "anchor", value: name });
+  const el = $("anchorWrap"); if (el) el.innerHTML = anchorChooser(false);  // 부분 갱신
+  renderFlowList(); updateGateButtons();
+};
+window.suggestAnchor = async (btn) => {
+  const inp = STATE.inputs || {};
+  if (btn) { btn.disabled = true; btn.textContent = "🤖 생성 중…"; }
+  try {
+    const d = await postJSON("/api/suggest-anchor", { topic: inp.topic || "", background: inp.background || "" });
+    if (d.levels) { for (const lv of d.levels) ANCHOR_DESC[lv.name] = lv.desc; }
+    const el = $("anchorWrap"); if (el) el.innerHTML = anchorChooser(false);
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = "🤖 이 주제에 맞춰 설명 생성 (실패, 재시도)"; }
+  }
+};
 
 function assetTagsHtml() {
   const arr = (STATE.inputs && STATE.inputs.asset_list) || [];
