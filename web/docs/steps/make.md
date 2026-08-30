@@ -8,3 +8,24 @@
 - 저폴리 목표: 프롭 ~2만 페이스, 텍스처 2048, glb ~3MB/에셋
 
 > 실측: 프롬프트 빈칸을 모델이 임의로 채우면 원하는 이미지가 안 나옴 → 슬롯 다 채우고 생성.
+
+## 3D (Hunyuan3D-2 로컬) — 실행 전 준비
+
+**shape(메시)는 가중치만 있으면 되지만, texgen(텍스처 베이킹)은 CUDA/C++ 확장을 빌드해야 함.**
+torch 2.11(+cu128) + 최신 MSVC(14.4x)에서 `custom_rasterizer` 빌드가 **C2872('std' ambiguous, compiled_autograd.h)** 로 깨진다 (실측·SETUP.md V2).
+
+### ✅ 미리 실행: 원클릭 빌드 셋업
+```
+powershell -ExecutionPolicy Bypass -File scripts/setup_hunyuan_texgen.ps1 -RepoDir <Hunyuan3D-2 경로>
+```
+- 파일을 편집하지 않고 **`$env:CL=/DTORCH_STABLE_ONLY`** 로 C2872 회피 + **`PYTHONUTF8=1`**(한글 로케일 함정) 후 확장 빌드.
+- 실패가 **연쇄**로 나면(whack-a-mole) → 결정적 대안 **호환 MSVC 14.3x 툴셋 설치**(무거움) 전에 **사용자 확인**.
+
+### 런타임 함정 (실측)
+- **`custom_rasterizer` DLL 로드 실패** → 스크립트에서 **`import torch` 를 먼저** 한 뒤 import.
+- **저폴리 임포트 메시가 Nanite면 언리얼 렌더에 안 보임** → Nanite 끄기.
+- **glTF base color 미연결** → 임포트 텍스처로 `M_*_AI` 머티리얼 직접 생성(텍스처가 texgen 없이도 언리얼에서 해결됨).
+
+### 폴백
+- texgen 못 뚫으면 **shape-only 메시 + gpt-image 소스로 언리얼 머티리얼** 로 진행 가능(품질 판정은 사용자).
+- 또는 **클라우드 3D(Rodin/Hyper3D)** 로 전환(로컬 빌드 불필요, 키 필요).
