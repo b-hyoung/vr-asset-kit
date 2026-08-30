@@ -3,8 +3,8 @@
   "roles": {
     "image": {
       "label": "이미지 생성",
-      "choices": ["FLUX.2 [dev] (로컬 diffusers)", "SD 3.5 Large (로컬)", "Qwen-Image (로컬)", "gpt-image-1"],
-      "default": "FLUX.2 [dev] (로컬 diffusers)"
+      "choices": ["FLUX (로컬)", "gpt-image-1"],
+      "default": "FLUX (로컬)"
     },
     "mesh_3d": {
       "label": "3D 생성 (이미지→3D)",

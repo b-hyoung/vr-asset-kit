@@ -470,7 +470,9 @@ function imageEngineReady() {
   const ch = (STATE.engine_choices || {}).image;
   if (!ch) return false;
   if (/gpt-image/i.test(ch)) return openaiKeyOk();
-  return true;
+  // 로컬 엔진 = 실제 모델이 다운로드돼 있어야 준비됨 (진단의 FLUX 모델 항목)
+  const it = DIAG && (DIAG.items || []).find((i) => i.name === "FLUX.2 모델 (로컬)");
+  return !!(it && it.ok);
 }
 window.chooseImageEngine = async (v) => {
   STATE = await postJSON(`/api/projects/${PID}/engine`, { key: "image", value: v });
@@ -517,7 +519,9 @@ function meshEngineReady() {
   const ch = (STATE.engine_choices || {}).mesh_3d;
   if (!ch) return false;
   if (isCloudMesh(ch)) return rodinKeyOk();
-  return true;
+  // 로컬(Hunyuan) = 모델이 실제로 있어야 준비됨
+  const it = DIAG && (DIAG.items || []).find((i) => i.name === "Hunyuan3D-2 준비 (레포+모델)");
+  return !!(it && it.ok);
 }
 function enginesReady() { return imageEngineReady() && meshEngineReady(); }
 window.chooseMeshEngine = async (v) => {
