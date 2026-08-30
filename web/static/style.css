@@ -83,6 +83,7 @@ code{font-family:var(--mono);font-size:12px;background:#0c0f13;border:1px solid 
 .idea-chips{display:flex;flex-wrap:wrap;gap:5px;flex:1}
 .idea-chip{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:3px 10px;font-size:12px;color:var(--dim);cursor:pointer}
 .idea-chip:hover{border-color:var(--accent);color:var(--ink)}
+.idea-chip.added{border-color:#2b5a3d;color:var(--good);background:#132318}
 .field textarea{min-height:56px;resize:vertical}
 .tag-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .tag-list .chip{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:3px 10px;font-size:12px;display:flex;gap:6px;align-items:center}

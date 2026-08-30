@@ -20,6 +20,7 @@ let MODEL_PRESENT = {};        // repo -> true/false/undefined(확인중)
 let CHECKING = new Set();      // 존재 확인 진행중 repo (중복 fetch 방지)
 let KEY_SAVED = new Set();     // 이번 세션에 저장한 키(즉시 반영)
 let HF_USER = null;            // {logged_in, name, invalid}
+let ASSET_SUGGESTIONS = null;  // 에셋 추천 캐시 (진입 시 자동 생성)
 
 async function loadHfWhoami() {
   try { HF_USER = await api("/api/hf/whoami"); } catch (e) { HF_USER = { logged_in: false }; }
@@ -124,6 +125,7 @@ async function selectProject(id) {
   STATE = await api(`/api/projects/${id}/state`);
   SELECTED = STATE.current_step;
   DIAG = null; DIAG_DONE = false;   // 프로젝트 바뀌면 진단 초기화
+  ASSET_SUGGESTIONS = null;         // 에셋 추천도 초기화
   connectSSE(id);
   renderAll();
   // 선택된 로컬 모델의 실제 존재를 확인 → 준비 깨졌으면 1단계 재잠금
@@ -278,7 +280,7 @@ function renderCenter() {
 
   // 에셋 단계: AI 제안 (추상적인 빈 목록 → 제안받아 골라 담기)
   if (s.id === "assets" && !locked) {
-    html += `<button type="button" class="btn small" onclick="suggestAssets()" style="margin-top:6px">🤖 AI로 에셋 제안 받기</button>
+    html += `<button type="button" class="btn small ghost" onclick="suggestAssets()" style="margin-top:6px">🔄 추천 다시 받기</button>
       <div id="assetSuggest" style="margin-top:8px"></div>`;
   }
 
@@ -322,6 +324,11 @@ function renderCenter() {
   $("stepDetail").innerHTML = html;
   wireInputs(s, locked);
   loadDoc(s.doc_ref);
+  // 에셋 단계 진입 시: 캐시 있으면 그리고, 없으면 자동 추천
+  if (s.id === "assets" && !locked) {
+    if (ASSET_SUGGESTIONS) paintAssetSuggest();
+    else if ((STATE.inputs || {}).topic) setTimeout(() => suggestAssets(), 0);
+  }
 }
 
 // 강도 스펙트럼 4단계 (은은/중간/뚜렷/하이) — 카드로 골라 앵커 확정
@@ -1157,21 +1164,31 @@ window.removeAsset = async (i) => {
   STATE = await postJSON(`/api/projects/${PID}/input`, { field: "asset_list", value: arr });
   refreshAssetTags();
 };
+function paintAssetSuggest() {
+  const box = $("assetSuggest"); if (!box) return;
+  if (!ASSET_SUGGESTIONS) { box.innerHTML = ""; return; }
+  const have = new Set((STATE.inputs || {}).asset_list || []);
+  let h = `<div class="hint" style="margin-bottom:4px">추천 에셋 — 클릭해서 담기 (필요 없는 건 무시)</div>`;
+  for (const c of ASSET_SUGGESTIONS) {
+    const chips = (c.items || []).map((t) => {
+      const on = have.has(t);
+      return `<button class="idea-chip ${on ? "added" : ""}" onclick="addAssetItem('${escapeAttr(t)}', this)">${on ? "✓ " : "+ "}${escapeHtml(t)}</button>`;
+    }).join("");
+    h += `<div class="idea-row"><span class="idea-lbl">${escapeHtml(c.name || "")}</span><div class="idea-chips">${chips}</div></div>`;
+  }
+  box.innerHTML = h;
+}
 window.suggestAssets = async () => {
   const box = $("assetSuggest"); if (!box) return;
   const inp = STATE.inputs || {};
-  box.innerHTML = `<span class="hint">🤖 제안 생성 중…</span>`;
+  box.innerHTML = `<span class="hint">🤖 추천 생성 중…</span>`;
   try {
     const d = await postJSON("/api/suggest-assets", { topic: inp.topic || "", background: inp.background || "", anchor: inp.anchor || "" });
     if (d.error) { box.innerHTML = `<span class="hint" style="color:var(--warn)">${escapeHtml(d.error)}</span>`; return; }
-    let h = `<div class="hint" style="margin-bottom:4px">제안된 에셋 — 클릭해서 담기 (필요 없는 건 무시)</div>`;
-    for (const c of (d.categories || [])) {
-      const chips = (c.items || []).map((t) => `<button class="idea-chip" onclick="addAssetItem('${escapeAttr(t)}', this)">+ ${escapeHtml(t)}</button>`).join("");
-      h += `<div class="idea-row"><span class="idea-lbl">${escapeHtml(c.name || "")}</span><div class="idea-chips">${chips}</div></div>`;
-    }
-    box.innerHTML = h;
+    ASSET_SUGGESTIONS = d.categories || [];
+    paintAssetSuggest();
   } catch (e) {
-    box.innerHTML = `<span class="hint" style="color:var(--bad)">제안 실패: ${e.message}</span>`;
+    box.innerHTML = `<span class="hint" style="color:var(--bad)">추천 실패: ${e.message}</span>`;
   }
 };
 
