@@ -12,6 +12,26 @@ let DIAG = null;       // 마지막 진단 결과
 let DIAG_DONE = false;  // 이번 프로젝트에서 진단을 한 번이라도 돌렸는가
 let DOC_FULL = "";     // 현재 문서 전체 텍스트 (더보기 모달용)
 let DOC_REF = "";      // 현재 문서 ref
+let COLLAPSED = {};    // 스테이지 접힘 상태(사용자 토글). 없으면 '완료 시 접힘' 기본
+
+// 스크롤 위치 보존(재렌더 시 위로 튀는 것 방지)
+function keepScroll(fn) {
+  const el = $("centerPane");
+  const sp = el ? el.scrollTop : 0;
+  fn();
+  if (!el) return;
+  el.scrollTop = sp;
+  setTimeout(() => { el.scrollTop = sp; }, 60);   // async 재그림 뒤 한 번 더
+  setTimeout(() => { el.scrollTop = sp; }, 220);
+}
+function stageCollapsed(key, fullyOk) {
+  return (key in COLLAPSED) ? COLLAPSED[key] : fullyOk;  // 기본: 완료된 단계는 접힘
+}
+window.toggleStage = (key) => {
+  const shown = (window._stageState || {})[key];  // 현재 화면의 접힘 여부를 정확히 반전
+  COLLAPSED[key] = !shown;
+  keepScroll(() => renderCenter());
+};
 
 const $ = (id) => document.getElementById(id);
 const api = async (url, opts) => {
@@ -381,8 +401,18 @@ function buildDiagStages(data, pending) {
       cardCls = reqMiss ? "stage-bad" : (ok === rel.length ? "stage-good" : "");
     }
     const stepTitle = s.action || s.label;
-    let h = `<div class="diag-stage ${cardCls}">`
-      + `<div class="diag-stage-h"><span class="stage-step">${oi + 1}단계</span> ${escapeHtml(stepTitle)} ${badge}</div>`
+    // 완료(관련 항목 전부 OK)된 단계는 기본 접힘 — 특히 기반 설치
+    let fullyOk = false;
+    if (!pending) {
+      const rel = list.filter((i) => itemRelevant(i.dep));
+      fullyOk = rel.length > 0 && rel.every((i) => i.ok);
+    }
+    const collapsed = !pending && stageCollapsed(s.key, fullyOk);
+    (window._stageState = window._stageState || {})[s.key] = collapsed;  // 토글이 참조
+    let h = `<div class="diag-stage ${cardCls} ${collapsed ? "collapsed" : ""}">`
+      + `<div class="diag-stage-h" onclick="toggleStage('${s.key}')"><span class="fold">${collapsed ? "▸" : "▾"}</span>`
+      + `<span class="stage-step">${oi + 1}단계</span> ${escapeHtml(stepTitle)} ${badge}</div>`
+      + `<div class="stage-body">`
       + (s.todo ? `<div class="stage-todo">할 일 · ${escapeHtml(s.todo)}</div>` : "");
     for (const i of list) {
       const rel = pending ? true : itemRelevant(i.dep);
@@ -394,7 +424,7 @@ function buildDiagStages(data, pending) {
     }
     if (s.key === "image" && !pending) h += imageChooser();  // 진단 후: 이미지 엔진 확정
     if (s.key === "mesh" && !pending) h += meshChooser();    // 진단 후: 3D 엔진 확정
-    return h + `</div>`;
+    return h + `</div></div>`;   // stage-body + diag-stage 닫기
   };
 
   // 차분한 세로 스택: 1→2→3→4 위에서 아래로, 단계 사이 ↓
@@ -440,7 +470,7 @@ function imageEngineReady() {
 }
 window.chooseImageEngine = async (v) => {
   STATE = await postJSON(`/api/projects/${PID}/engine`, { key: "image", value: v });
-  renderCenter();
+  keepScroll(() => renderCenter());
 };
 window.saveOpenAIKey = async () => {
   const el = $("openaiKeyInput");
@@ -449,7 +479,7 @@ window.saveOpenAIKey = async () => {
   await postJSON("/api/env", { key: "OPENAI_API_KEY", value: v });
   if (el) el.value = "";
   await runDiagnose();   // 재진단 → 키 OK 반영
-  renderCenter();        // 선택/게이트 갱신
+  keepScroll(() => renderCenter());  // 선택/게이트 갱신 (스크롤 보존)
 };
 
 // 3D 엔진 선택 (Hunyuan 로컬 / Rodin 클라우드)
@@ -488,7 +518,7 @@ function meshEngineReady() {
 function enginesReady() { return imageEngineReady() && meshEngineReady(); }
 window.chooseMeshEngine = async (v) => {
   STATE = await postJSON(`/api/projects/${PID}/engine`, { key: "mesh_3d", value: v });
-  renderCenter();
+  keepScroll(() => renderCenter());
 };
 window.saveRodinKey = async () => {
   const el = $("rodinKeyInput");
@@ -497,7 +527,7 @@ window.saveRodinKey = async () => {
   await postJSON("/api/env", { key: "RODIN_API_KEY", value: v });
   if (el) el.value = "";
   await runDiagnose();
-  renderCenter();
+  keepScroll(() => renderCenter());
 };
 
 // 항목이 현재 엔진 선택에 필요한지 (선택에 따라 불필요한 건 회색+필수제외)

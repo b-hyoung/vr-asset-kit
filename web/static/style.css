@@ -131,7 +131,12 @@ code{font-family:var(--mono);font-size:12px;background:#0c0f13;border:1px solid 
 .diag-stage{position:relative;border:1px solid var(--line);border-radius:11px;padding:10px 12px;background:#13171d}
 .diag-stage.stage-good{border-color:#2b5a3d}
 .diag-stage.stage-bad{border-color:#5a2b2b}
-.diag-stage-h{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:8px;justify-content:space-between}
+.diag-stage-h{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.diag-stage-h .fold{color:var(--faint);font-size:10px;width:12px;flex:none}
+.diag-stage-h .stage-count{margin-left:auto}
+.diag-stage.collapsed .stage-body{display:none}
+.diag-stage.collapsed{opacity:.92}
+.diag-stage.collapsed .diag-stage-h{margin-bottom:0}
 .stage-count{font-family:var(--mono);font-size:11px;font-weight:700;padding:1px 8px;border-radius:12px;border:1px solid var(--line);color:var(--dim)}
 .stage-count.good{color:var(--good);border-color:#2b5a3d;background:#132318}
 .stage-count.bad{color:var(--bad);border-color:#5a2b2b;background:#241416}
