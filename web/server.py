@@ -99,10 +99,11 @@ def _run_spectrum(engine, repo, topic, bg):
             # 로컬 diffusers 생성
             if not repo:
                 st["error"] = "로컬 모델(repo) 미선택"; return
-            steps = 4 if "schnell" in repo.lower() else 25
+            rl = repo.lower()
+            steps = 4 if ("schnell" in rl or "turbo" in rl or "lightning" in rl) else 20
             outp = os.path.join(BASE, "projects", "_spectrum_out.json")
             jobp = os.path.join(BASE, "projects", "_spectrum_job.json")
-            job = {"repo": repo, "steps": steps, "size": 768, "out": outp,
+            job = {"repo": repo, "steps": steps, "size": 512, "out": outp,
                    "prompts": [{"name": n, "prompt": _spectrum_prompt(topic, bg, s)} for n, s in _INTENS]}
             os.makedirs(os.path.dirname(jobp), exist_ok=True)
             with open(jobp, "w", encoding="utf-8") as f:
