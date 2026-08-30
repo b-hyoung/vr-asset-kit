@@ -139,7 +139,8 @@ function connectSSE(id) {
   sse.addEventListener("update", async () => {
     try {
       STATE = await api(`/api/projects/${id}/state`);
-      renderAll();
+      // 가운데는 사용자가 조작 중이므로 건드리지 않음 (스크롤 튐·생성물 소실 방지)
+      renderFlowList(); renderAudit(); updateGateButtons();
     } catch (e) {}
   });
 }
@@ -824,8 +825,8 @@ async function maybeRelockEnv() {
   if (st && st.gate_passed && envDefinitelyNotReady()) {
     try {
       STATE = await postJSON(`/api/projects/${PID}/ungate`, { step: "env" });
-      renderFlowList();
-      if (SELECTED !== "env") { SELECTED = "env"; renderCenter(); }
+      renderFlowList();          // 왼쪽 목록만 갱신 (강제 이동/전체 리렌더 X → 스크롤 유지)
+      updateGateButtons();
     } catch (e) {}
   }
 }
