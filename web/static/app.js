@@ -644,9 +644,14 @@ window.runInstall = async (name) => {
     if (log) { log.textContent = (s.lines || []).join("\n"); log.scrollTop = log.scrollHeight; }
     if (!s.running && s.code !== null && s.code !== undefined) {
       if (s.code === 0) {
-        if (hint) hint.innerHTML = '<span style="color:var(--good)">설치 완료 ✅ — 재진단 중…</span>';
+        if (hint) hint.innerHTML = '<span style="color:var(--accent)">명령 완료 · 재진단 중…</span>';
         await runDiagnose();
         keepScroll(() => renderCenter());
+        const nowItem = ((window._diagData || {}).items || []).find((i) => i.name === name);
+        if (hint) hint.innerHTML = (nowItem && nowItem.ok)
+          ? '<span style="color:var(--good)">설치 완료 ✅ — 이 항목 OK (모달 닫아도 됩니다)</span>'
+          : '<span style="color:var(--warn)">명령 완료 ✅ 하지만 이 항목은 추가 단계가 남음 — 아래 가이드/로그 확인 (예: FLUX는 모델 가중치 다운로드가 별도)</span>';
+        if (btn) btn.disabled = false;
       } else {
         if (hint) hint.innerHTML = '<span style="color:var(--bad)">실패(코드 ' + s.code + ') — 로그 확인 후 수동 가이드</span>';
         if (btn) btn.disabled = false;
