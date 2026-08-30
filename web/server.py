@@ -407,7 +407,8 @@ class Handler(BaseHTTPRequestHandler):
                 from huggingface_hub import scan_cache_dir
                 for r in scan_cache_dir().repos:
                     if r.repo_id.lower() == repo.lower():
-                        present, size = True, round(r.size_on_disk / 1e9, 1)
+                        size = round(r.size_on_disk / 1e9, 2)
+                        present = r.size_on_disk > 5e8   # 0.5GB 미만은 메타데이터만 → 미다운로드로 간주
                         break
             except Exception:
                 pass

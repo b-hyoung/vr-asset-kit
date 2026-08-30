@@ -198,7 +198,7 @@ def _hf_repo_present(substr):
     try:
         from huggingface_hub import scan_cache_dir
         for r in scan_cache_dir().repos:
-            if substr.lower() in r.repo_id.lower():
+            if substr.lower() in r.repo_id.lower() and r.size_on_disk > 5e8:
                 return (r.repo_id, round(r.size_on_disk / 1e9, 1))
     except Exception:
         pass
@@ -244,7 +244,7 @@ def _hf_repo_exact(repo):
     try:
         from huggingface_hub import scan_cache_dir
         for r in scan_cache_dir().repos:
-            if r.repo_id.lower() == repo.lower():
+            if r.repo_id.lower() == repo.lower() and r.size_on_disk > 5e8:  # 0.5GB↑만 실다운로드
                 return (r.repo_id, round(r.size_on_disk / 1e9, 1))
     except Exception:
         pass
