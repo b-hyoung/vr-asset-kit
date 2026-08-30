@@ -110,6 +110,8 @@ code{font-family:var(--mono);font-size:12px;background:#0c0f13;border:1px solid 
 .inst-box{margin:0 0 14px;padding:12px 14px;border:1px solid var(--accent);border-radius:10px;background:#122029}
 .inst-log{display:none;margin-top:10px;max-height:220px;overflow:auto;background:#0c0f13;border:1px solid var(--line);border-radius:8px;padding:10px;font-family:var(--mono);font-size:11px;line-height:1.5;color:var(--dim);white-space:pre-wrap}
 .auth-box{margin:8px 0;padding:10px 12px;border:1px dashed var(--gate);border-radius:9px;background:#141a24}
+.auth-step{font-size:12px;color:var(--dim);margin:6px 0;line-height:1.5}
+.auth-step b{color:var(--ink)}
 .auth-box a{text-decoration:none}
 
 /* 우측 문서 — 마크다운 렌더 */

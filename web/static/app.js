@@ -941,27 +941,28 @@ window.openGuide = (name) => {
   $("docOverlay").classList.add("open");
 };
 
-// HF 로그인 상태에 맞춰 인증 박스 렌더
+// HF 로그인 상태에 맞춰 인증 박스 렌더 (게이트 모델 4단계 안내)
 function hfAuthBox(repo) {
-  const licLink = `<a href="#" onclick="window.open('https://huggingface.co/' + encodeURIComponent('${escapeAttr(repo)}'));return false" style="color:var(--accent)">② 이 모델 라이선스 동의 ↗</a>`;
+  const licUrl = "https://huggingface.co/" + repo;
+  const licLink = `<a href="#" onclick="window.open('${escapeAttr(licUrl)}');return false" style="color:var(--accent)">라이선스 동의 페이지 열기 ↗</a>`;
   if (HF_USER && HF_USER.logged_in) {
     return `<div class="auth-box">
-      <div class="hint" style="color:var(--good)">✅ HuggingFace 로그인됨: <b>${escapeHtml(HF_USER.name || "")}</b> — 토큰 재입력 불필요</div>
-      <div style="margin-top:6px;font-size:12px">게이트 모델이면 ${licLink} 한 번만 눌러 동의하세요.</div>
+      <div class="hint" style="color:var(--good);margin-bottom:4px">✅ HuggingFace 로그인됨: <b>${escapeHtml(HF_USER.name || "")}</b></div>
+      <div style="font-size:12px">게이트 모델이면 <b>먼저 ${licLink}</b> → 상단 <b>"Agree and access repository"</b> 클릭 후 → 아래 <b>'이 모델 설치'</b>.</div>
     </div>`;
   }
-  const warn = HF_USER && HF_USER.invalid ? "저장된 토큰이 <b>만료/무효</b>입니다 — 새 토큰으로 로그인하세요." : "게이트 모델은 로그인이 필요합니다.";
+  const warn = HF_USER && HF_USER.invalid ? "저장된 토큰이 <b>만료/무효</b>예요 — 새 토큰으로 로그인하세요." : "게이트 모델은 <b>로그인 + 라이선스 동의</b>가 필요해요.";
   return `<div class="auth-box">
-    <div class="hint" style="margin-bottom:6px">🔒 ${warn}</div>
-    <div style="display:flex;gap:6px;margin-bottom:6px">
-      <input id="hfToken" type="password" placeholder="HF 토큰 (hf_...) 붙여넣기" autocomplete="off" spellcheck="false" style="flex:1;background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px">
-      <button class="btn small" onclick="hfLogin()">로그인</button>
+    <div class="hint" style="margin-bottom:8px">🔒 ${warn}</div>
+    <div class="auth-step"><b>1)</b> <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noreferrer" style="color:var(--accent)">토큰 발급 ↗</a> — New token → 유형 <b>Read</b> → 복사(hf_...)</div>
+    <div class="auth-step"><b>2)</b> 토큰 붙여넣고 로그인:
+      <div style="display:flex;gap:6px;margin-top:4px">
+        <input id="hfToken" type="password" placeholder="hf_..." autocomplete="off" spellcheck="false" style="flex:1;background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px">
+        <button class="btn small" onclick="hfLogin()">로그인</button>
+      </div>
     </div>
-    <div style="display:flex;gap:12px;font-size:12px">
-      <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noreferrer" style="color:var(--accent)">① 토큰 발급(read) ↗</a>
-      ${licLink}
-    </div>
-    <div class="hint" style="margin-top:4px">한 번 로그인하면 저장돼서 이후엔 자동으로 쓰입니다.</div>
+    <div class="auth-step"><b>3)</b> ${licLink} → 상단 <b>"Agree and access repository"</b> 클릭</div>
+    <div class="auth-step"><b>4)</b> 아래 <b>'이 모델 설치'</b> → 다운로드 (대용량·시간 걸림)</div>
   </div>`;
 }
 window.hfLogin = async () => {
