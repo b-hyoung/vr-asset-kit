@@ -78,6 +78,45 @@ def _spectrum_prompt(topic, bg, style):
     return ("%s, %s, %s, concept art" % (topic, bg, style))[:220]
 
 
+# 로컬 SDXL은 영어 CLIP → 한글 주제 이해 못함. OpenAI로 영어 번역(캐시).
+_TRANSLATE_CACHE = {}
+_STYLE_EN = {
+    "은은": "soft muted low-contrast pastel lighting",
+    "중간": "natural realistic medium contrast",
+    "뚜렷": "vivid high-contrast bold colors",
+    "하이": "hyper vivid dramatic glowing high-contrast",
+}
+
+
+def _has_korean(s):
+    return any("가" <= ch <= "힣" for ch in (s or ""))
+
+
+def _translate_en(topic, bg):
+    key = (topic or "") + "|" + (bg or "")
+    if key in _TRANSLATE_CACHE:
+        return _TRANSLATE_CACHE[key]
+    if not (_has_korean(topic) or _has_korean(bg)):
+        _TRANSLATE_CACHE[key] = (topic, bg)
+        return topic, bg
+    ok = _openai_key()
+    if not ok:
+        return topic, bg
+    try:
+        prompt = ("다음을 이미지 생성용 영어 명사구로 간결 번역. JSON만: "
+                  '{"topic":"","background":""}\n주제: %s\n배경: %s' % (topic, bg))
+        rb = json.dumps({"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}],
+                         "response_format": {"type": "json_object"}, "temperature": 0.2}).encode()
+        req = _urlreq.Request("https://api.openai.com/v1/chat/completions", data=rb,
+                              headers={"Authorization": "Bearer " + ok, "Content-Type": "application/json"})
+        d = json.loads(json.load(_urlreq.urlopen(req, timeout=30))["choices"][0]["message"]["content"])
+        res = (d.get("topic") or topic, d.get("background") or bg)
+        _TRANSLATE_CACHE[key] = res
+        return res
+    except Exception:
+        return topic, bg
+
+
 # 모델을 켜둔 채 재사용 (매번 재로딩 방지 → 빠름·GPU 활용)
 _PIPE_CACHE = {"repo": None, "pipe": None}
 
@@ -163,15 +202,20 @@ def _run_spectrum(engine, repo, topic, bg):
             rl = repo.lower()
             fast = ("schnell" in rl or "turbo" in rl or "lightning" in rl)
             steps = 4 if fast else 20
+            # 한글 주제 → 영어(로컬 CLIP 이해용)
+            en_topic, en_bg = _translate_en(topic, bg)
+            if (en_topic, en_bg) != (topic, bg):
+                st["log"].append("프롬프트 영어화: %s / %s" % (en_topic, en_bg))
             imgs = []
             for name, style in _INTENS:
                 st["log"].append("생성: " + name)
                 kw = {"num_inference_steps": steps, "height": 512, "width": 512}
                 if fast:
                     kw["guidance_scale"] = 0.0
+                prompt = "%s, %s, %s, concept art" % (en_topic, en_bg, _STYLE_EN.get(name, style))
                 try:
                     with torch.inference_mode():
-                        out = pipe(_spectrum_prompt(topic, bg, style), **kw)
+                        out = pipe(prompt, **kw)
                 except Exception as e:
                     torch.cuda.empty_cache()
                     st["error"] = "'%s' 생성 실패: %s" % (name, str(e)[:120]); return
