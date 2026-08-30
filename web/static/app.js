@@ -620,9 +620,20 @@ window.openGuide = (name) => {
   if (AUTO_INSTALL.has(name)) {
     const wingetItem = /node|git|Blender/i.test(name);
     const warn = (wingetItem && !WINGET) ? " (winget 미설치 — 아래 수동 가이드 이용)" : "";
+    const isFlux = name === "FLUX.2 모델 (로컬)";
+    const modelSel = isFlux ? `<div style="margin-bottom:8px">
+      <span class="hint">받을 모델 선택: </span>
+      <select id="fluxRepo" style="background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:5px 8px;font-size:12.5px">
+        <option value="black-forest-labs/FLUX.2-dev">FLUX.2 [dev] · 최신·고화질 (~수십GB)</option>
+        <option value="black-forest-labs/FLUX.1-dev">FLUX.1 [dev] · 안정</option>
+        <option value="black-forest-labs/FLUX.1-schnell">FLUX.1 [schnell] · 빠름·가벼움</option>
+      </select></div>` : "";
+    const label = isFlux ? "⚡ 선택 모델 설치(가중치 다운로드)" : "⚡ 지금 설치";
+    const note = isFlux ? "선택한 모델 가중치를 받습니다(대용량·시간 걸림)." : `이 자리에서 바로 설치합니다${warn}`;
     extra = `<div class="inst-box">
-      <button class="btn gate" id="instBtn" onclick="runInstall('${escapeAttr(name)}')" ${(wingetItem && !WINGET) ? "disabled" : ""}>⚡ 지금 설치</button>
-      <span class="hint" id="instHint" style="margin-left:8px">이 자리에서 바로 설치합니다${warn}</span>
+      ${modelSel}
+      <button class="btn gate" id="instBtn" onclick="runInstall('${escapeAttr(name)}')" ${(wingetItem && !WINGET) ? "disabled" : ""}>${label}</button>
+      <span class="hint" id="instHint" style="margin-left:8px">${note}</span>
       <pre id="instLog" class="inst-log" style="display:none"></pre>
     </div>`;
   }
@@ -635,7 +646,9 @@ window.runInstall = async (name) => {
   if (btn) btn.disabled = true;
   if (hint) hint.textContent = "설치 시작…";
   if (log) { log.style.display = "block"; log.textContent = ""; }
-  try { await postJSON("/api/install", { item: name }); }
+  const repoSel = $("fluxRepo");
+  const payload = repoSel ? { item: name, repo: repoSel.value } : { item: name };
+  try { await postJSON("/api/install", payload); }
   catch (e) { if (hint) hint.textContent = "설치 시작 실패: " + e.message; if (btn) btn.disabled = false; return; }
   while (true) {
     await sleep(1500);

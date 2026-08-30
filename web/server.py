@@ -335,7 +335,22 @@ class Handler(BaseHTTPRequestHandler):
 
         if p == "/api/install":
             item = body.get("item")
-            cmds = INSTALL_CMDS.get(item)
+            if item == "FLUX.2 모델 (로컬)":
+                # 선택한 FLUX 모델(화이트리스트)까지 다운로드
+                FLUX_REPOS = {"black-forest-labs/FLUX.2-dev",
+                              "black-forest-labs/FLUX.1-dev",
+                              "black-forest-labs/FLUX.1-schnell"}
+                repo = body.get("repo") or "black-forest-labs/FLUX.2-dev"
+                if repo not in FLUX_REPOS:
+                    return self._json({"error": "허용되지 않은 모델"}, 400)
+                cmds = [
+                    _PYEXE + ["-m", "pip", "install", "-U", "diffusers", "transformers",
+                              "accelerate", "huggingface_hub"],
+                    _PYEXE + ["-c", "from huggingface_hub import snapshot_download; "
+                              "snapshot_download('%s'); print('DONE %s')" % (repo, repo)],
+                ]
+            else:
+                cmds = INSTALL_CMDS.get(item)
             if not cmds:
                 return self._json({"error": "그 자리 설치 미지원 항목(수동 설치)"}, 400)
             with _install_lock:
