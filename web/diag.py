@@ -31,7 +31,7 @@ NAME_STAGE = {
     "CUDA / GPU (nvidia-smi)": "base", "PyTorch (GPU)": "base",
     "Blender (선택·분석)": "base",
     "OPENAI_API_KEY": "image",
-    "Hunyuan3D-2 준비 (레포+모델)": "mesh", "RODIN_API_KEY (Hyper3D)": "mesh",
+    "RODIN_API_KEY (Hyper3D)": "mesh",
     "Unreal Engine": "unreal", "unrealclaude MCP 등록": "unreal",
     "Blender MCP 등록": "unreal",
     "Unreal 에디터 실행중": "unreal", "REST :3000 (execute_script)": "unreal",
@@ -152,7 +152,7 @@ DEP = {
     "Blender (선택·분석)": "always",
     "CUDA / GPU (nvidia-smi)": "local", "PyTorch (GPU)": "local",
     "OPENAI_API_KEY": "image:cloud",
-    "Hunyuan3D-2 준비 (레포+모델)": "mesh:local", "RODIN_API_KEY (Hyper3D)": "mesh:cloud",
+    "RODIN_API_KEY (Hyper3D)": "mesh:cloud",
     "Unreal Engine": "always", "unrealclaude MCP 등록": "always",
     "Blender MCP 등록": "always",
     "Unreal 에디터 실행중": "always", "REST :3000 (execute_script)": "always",
@@ -222,7 +222,6 @@ def spec():
         {"name": "uv", "required": False, "need": "파이썬 패키지 관리 (선택)"},
         {"name": "Blender (선택·분석)", "required": False, "need": "분석·블록아웃·검수용 (생성 아님)"},
         {"name": "OPENAI_API_KEY", "required": False, "need": "대안 — gpt-image-1 엔진 고를 때만"},
-        {"name": "Hunyuan3D-2 준비 (레포+모델)", "required": True, "need": "로컬 3D 생성 — 레포+가중치"},
         {"name": "RODIN_API_KEY (Hyper3D)", "required": False, "need": "클라우드 3D(Rodin/Hyper3D) 쓸 때만"},
         {"name": "Unreal Engine", "required": False, "need": "UE_5.x — 임포트/배치/렌더"},
         {"name": "unrealclaude MCP 등록", "required": True, "need": "언리얼 직접 조종"},
@@ -337,19 +336,7 @@ def run(hunyuan_dir=None, env_file=None, image_repo=None):
     else:
         add("", "PyTorch (GPU)", False, "미설치 — 로컬 FLUX/Hunyuan 돌릴 때만 필요(지금은 미뤄도 됨)")
 
-    # === ② 3D 생성: Hunyuan3D-2 준비 (레포+모델 통합) ===
-    repo = os.path.isdir(hd)
-    hn = _hf_repo_present("hunyuan3d")   # 캐시에서 Hunyuan3D 계열 모델 탐지
-    if not hn and os.path.isdir(os.path.join(USER, ".cache", "hy3dgen")):
-        hn = ("hy3dgen cache", None)
-    # 모델이 핵심. 모델 있으면 OK(레포 코드는 별도 안내).
-    if hn:
-        detail = "모델 있음: %s%s" % (hn[0], (" · %sGB" % hn[1]) if hn[1] else "")
-        if not repo:
-            detail += " · (실행용 레포 코드는 별도 clone 필요할 수 있음)"
-    else:
-        detail = "모델 미다운로드 — git clone Tencent/Hunyuan3D-2 후 첫 실행 시 자동, 또는 hf download"
-    add("", "Hunyuan3D-2 준비 (레포+모델)", bool(hn), detail, required=True)
+    # (로컬 3D 모델 상태는 3D 엔진 카드의 모델 선택 UI에서 경량 확인 — 진단에서 분리)
 
     # Rodin/Hyper3D 키 (클라우드 3D 대안)
     rk, rk_where = False, ""

@@ -577,10 +577,11 @@ window.saveOpenAIKey = async () => {
   updateReadyUI();
 };
 
-// 3D 엔진 선택 (Hunyuan 로컬 / Rodin 클라우드)
+// 3D 엔진 선택 (Hunyuan 로컬 / Rodin 클라우드) — 이미지와 동일 패턴
 function meshChooser() {
   const choices = (ENGINES.roles && ENGINES.roles.mesh_3d && ENGINES.roles.mesh_3d.choices) || [];
   const cur = (STATE.engine_choices || {}).mesh_3d || "";
+  const repo = (STATE.engine_choices || {}).mesh_repo || "";
   let h = `<div class="img-choose"><div class="ic-h">3D 엔진 — 하나를 눌러 확정</div>`;
   for (const c of choices) {
     const cloud = isCloudMesh(c);
@@ -588,6 +589,38 @@ function meshChooser() {
     h += `<button class="img-opt ${on ? "on" : ""}" onclick="chooseMeshEngine('${escapeAttr(c)}')">
       <span class="io-dot">${on ? "●" : "○"}</span><span class="io-name">${escapeHtml(c)}</span>${cloud ? '<span class="io-tag key">🔑 키필요</span>' : '<span class="io-tag local">로컬</span>'}</button>`;
   }
+
+  // 로컬(Hunyuan): 모델 카탈로그 선택 + 설치
+  if (cur && !isCloudMesh(cur)) {
+    h += `<div class="model-pick"><div class="hint" style="margin-bottom:6px">3D 모델 선택 (마우스 올리면 설명):</div><div class="model-list">`;
+    for (const m of (MODELS.mesh || [])) {
+      const on = m.repo === repo;
+      const tags = (m.tags || []).map((t) => `<span class="mtag">${escapeHtml(t)}</span>`).join("");
+      h += `<button class="model-opt ${on ? "on" : ""}" title="${escapeAttr(m.desc || "")}" onclick="setMeshRepo('${escapeAttr(m.repo)}')">
+        <span class="io-dot">${on ? "●" : "○"}</span>
+        <span class="mo-main"><span class="mo-name">${escapeHtml(m.name)}</span> <span class="mo-repo">${escapeHtml(m.repo)}</span><div class="mo-tags">${tags}</div></span>
+      </button>`;
+    }
+    h += `</div>`;
+    if (repo) {
+      if (MODEL_PRESENT[repo] === undefined && !CHECKING.has(repo)) {
+        CHECKING.add(repo);
+        checkPresence(repo).then(() => { CHECKING.delete(repo); updateReadyUI(); });
+      }
+      const pres = MODEL_PRESENT[repo];
+      const ok = pres === true;
+      const statusTxt = pres === undefined ? "⏳ 확인 중…" : (ok ? "✓ 모델 있음: " + escapeHtml(repo) : "미다운로드: " + escapeHtml(repo));
+      h += `<div class="ic-status ${ok ? "ok" : "wait"}" style="margin-top:8px">${statusTxt}</div>`;
+      if (pres === false) {
+        h += `<button class="btn gate" style="margin-top:6px" onclick="installMeshModel()">⚡ 이 모델 설치(다운로드)</button>
+          <div class="hint" style="margin-top:4px">Hunyuan은 게이트 아님(토큰 불필요). 실행엔 레포 코드/의존성이 추가로 필요할 수 있음.</div>
+          <span class="hint" id="instHint" style="display:block;margin-top:6px"></span>
+          <pre id="instLog" class="inst-log"></pre>`;
+      }
+    }
+    h += `</div>`;
+  }
+
   if (isCloudMesh(cur) && !rodinKeyOk()) {
     h += `<div class="key-row">
       <input id="rodinKeyInput" type="password" placeholder="RODIN_API_KEY 붙여넣기" autocomplete="off" spellcheck="false">
@@ -595,11 +628,23 @@ function meshChooser() {
     </div><div class="hint" style="color:var(--warn);margin-top:4px">Rodin은 키가 있어야 확정됩니다.</div>`;
   }
   const msg = !cur ? "아직 미선택 — 하나를 눌러 확정하세요"
-    : (meshEngineReady() ? `✓ '${escapeHtml(cur)}' 확정 준비됨` : "키 입력 후 확정 가능");
+    : (meshEngineReady() ? `✓ '${escapeHtml(cur)}' 확정 준비됨` : "모델 다운로드/키 후 확정 가능");
   h += `<div class="ic-status ${!cur ? "wait" : (meshEngineReady() ? "ok" : "wait")}">${msg}</div>`;
   return h + `</div>`;
 }
 function isCloudMesh(v) { return /rodin|hyper3d|클라우드/i.test(v || ""); }
+window.setMeshRepo = async (v) => {
+  v = (v || "").trim();
+  if (!v) return;
+  STATE = await postJSON(`/api/projects/${PID}/engine`, { key: "mesh_repo", value: v });
+  updateReadyUI();
+  await checkPresence(v);
+  updateReadyUI();
+};
+window.installMeshModel = () => {
+  const repo = (STATE.engine_choices || {}).mesh_repo;
+  if (repo) runInstall("3D 모델 (로컬)", repo);
+};
 function rodinKeyOk() {
   if (KEY_SAVED.has("RODIN_API_KEY")) return true;
   const item = DIAG && (DIAG.items || []).find((i) => i.name === "RODIN_API_KEY (Hyper3D)");
@@ -609,9 +654,9 @@ function meshEngineReady() {
   const ch = (STATE.engine_choices || {}).mesh_3d;
   if (!ch) return false;
   if (isCloudMesh(ch)) return rodinKeyOk();
-  // 로컬(Hunyuan) = 모델이 실제로 있어야 준비됨
-  const it = DIAG && (DIAG.items || []).find((i) => i.name === "Hunyuan3D-2 준비 (레포+모델)");
-  return !!(it && it.ok);
+  // 로컬(Hunyuan) = 선택한 모델(repo)이 실제로 받아져 있어야 준비됨 (경량 캐시)
+  const repo = (STATE.engine_choices || {}).mesh_repo;
+  return !!repo && MODEL_PRESENT[repo] === true;
 }
 function enginesReady() { return imageEngineReady() && meshEngineReady(); }
 window.chooseMeshEngine = async (v) => {

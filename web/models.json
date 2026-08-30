@@ -15,5 +15,11 @@
       "desc": "성숙한 범용 모델. 커뮤니티 LoRA·파인튜닝 방대. 비교적 가벼움." },
     { "repo": "Qwen/Qwen-Image", "name": "Qwen-Image", "tags": ["텍스트렌더", "자유"],
       "desc": "이미지 속 글자(한/영) 렌더 최강. Apache-2.0(상업 자유). 포스터·간판류." }
+  ],
+  "mesh": [
+    { "repo": "tencent/Hunyuan3D-2", "name": "Hunyuan3D-2", "tags": ["고품질", "대용량 28GB"],
+      "desc": "이미지→3D 최고 품질. 가중치 약 28GB. 게이트 아님(토큰 불필요)." },
+    { "repo": "tencent/Hunyuan3D-2mini", "name": "Hunyuan3D-2 mini", "tags": ["경량 8GB", "빠름"],
+      "desc": "경량판(약 8GB). 더 빠르고 가벼움. 프로토타이핑·저사양에 적합." }
   ]
 }
