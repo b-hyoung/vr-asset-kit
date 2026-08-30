@@ -187,6 +187,30 @@ def _port_open(port, host="127.0.0.1"):
         return False
 
 
+def _hf_repo_present(substr):
+    """HF 캐시(scan_cache_dir; HF_HOME 등 환경변수도 자동 반영)에서 repo_id에 substr 포함된
+    repo를 찾아 (repo_id, GB) 반환. huggingface_hub 없으면 경로 글롭으로 폴백."""
+    try:
+        from huggingface_hub import scan_cache_dir
+        for r in scan_cache_dir().repos:
+            if substr.lower() in r.repo_id.lower():
+                return (r.repo_id, round(r.size_on_disk / 1e9, 1))
+    except Exception:
+        pass
+    # 폴백: 기본 캐시 경로 글롭
+    hub = os.environ.get("HF_HUB_CACHE") or (
+        os.path.join(os.environ["HF_HOME"], "hub") if os.environ.get("HF_HOME")
+        else os.path.join(USER, ".cache", "huggingface", "hub"))
+    try:
+        if os.path.isdir(hub):
+            for d in os.listdir(hub):
+                if d.startswith("models--") and substr.lower() in d.lower():
+                    return (d.replace("models--", "").replace("--", "/"), None)
+    except Exception:
+        pass
+    return None
+
+
 def spec():
     """진단 전에 먼저 보여줄 체크리스트 정의 (검사 실행 없이 빠르게).
     run() 이 채우는 항목 이름과 1:1로 맞춘다."""
@@ -245,15 +269,14 @@ def run(hunyuan_dir=None, env_file=None):
     B = "B. 이미지 생성"
     # 로컬 이미지: FLUX.2 [dev] diffusers 모델 (HF 캐시). 서버 없이 스크립트 실행.
     flux_dir = os.environ.get("VRKIT_FLUX_DIR")
-    flux_cands = ([flux_dir] if flux_dir else []) + [
-        os.path.join(USER, ".cache", "huggingface", "hub", "models--black-forest-labs--FLUX.2-dev"),
-        os.path.join(USER, ".cache", "huggingface", "hub", "models--black-forest-labs--FLUX.1-dev"),
-    ]
-    flux = next((p for p in flux_cands if p and os.path.isdir(p)), None)
-    add(B, "FLUX.2 모델 (로컬)", bool(flux),
-        ("가중치 캐시 있음: " + os.path.basename(flux)) if flux
-        else "미다운로드 — HF black-forest-labs/FLUX.2-dev (diffusers, fp8). 첫 실행 시 받음",
-        required=False)
+    if flux_dir and os.path.isdir(flux_dir):
+        add(B, "FLUX.2 모델 (로컬)", True, "모델 폴더 지정됨: " + flux_dir, required=False)
+    else:
+        fx = _hf_repo_present("flux")   # 캐시에서 flux 계열 모델 탐지(id/위치 무관)
+        add(B, "FLUX.2 모델 (로컬)", bool(fx),
+            ("모델 있음: %s%s" % (fx[0], (" · %sGB" % fx[1]) if fx[1] else "")) if fx
+            else "모델 가중치 미다운로드 — 의존성 말고 '모델'이 필요: hf download black-forest-labs/FLUX.2-dev",
+            required=False)
     key_found, key_where = False, ""
     candidates = []
     if env_file:
@@ -313,19 +336,17 @@ def run(hunyuan_dir=None, env_file=None):
 
     # === ② 3D 생성: Hunyuan3D-2 준비 (레포+모델 통합) ===
     repo = os.path.isdir(hd)
-    hf = os.path.join(USER, ".cache", "huggingface", "hub", "models--tencent--Hunyuan3D-2")
-    hy = os.path.join(USER, ".cache", "hy3dgen")
-    model = os.path.isdir(hf) or os.path.isdir(hy)
-    both = repo and model
-    if both:
-        detail = "레포+모델 준비됨"
-    elif repo and not model:
-        detail = "레포 있음 · 모델 미다운로드(첫 실행 시 받음)"
-    elif model and not repo:
-        detail = "모델 캐시 있음 · 레포 없음 — git clone 필요"
+    hn = _hf_repo_present("hunyuan3d")   # 캐시에서 Hunyuan3D 계열 모델 탐지
+    if not hn and os.path.isdir(os.path.join(USER, ".cache", "hy3dgen")):
+        hn = ("hy3dgen cache", None)
+    # 모델이 핵심. 모델 있으면 OK(레포 코드는 별도 안내).
+    if hn:
+        detail = "모델 있음: %s%s" % (hn[0], (" · %sGB" % hn[1]) if hn[1] else "")
+        if not repo:
+            detail += " · (실행용 레포 코드는 별도 clone 필요할 수 있음)"
     else:
-        detail = "레포·모델 모두 없음 — git clone + 모델 다운로드"
-    add("", "Hunyuan3D-2 준비 (레포+모델)", both, detail, required=True)
+        detail = "모델 미다운로드 — git clone Tencent/Hunyuan3D-2 후 첫 실행 시 자동, 또는 hf download"
+    add("", "Hunyuan3D-2 준비 (레포+모델)", bool(hn), detail, required=True)
 
     # Rodin/Hyper3D 키 (클라우드 3D 대안)
     rk, rk_where = False, ""
