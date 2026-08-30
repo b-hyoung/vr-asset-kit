@@ -36,6 +36,7 @@ function updateReadyUI() {
   const mc = $("meshChooserWrap"); if (mc) mc.innerHTML = meshChooser();
   const ef = $("envFlow"); if (ef) ef.outerHTML = envFlowLine();
   updateGateButtons();
+  maybeRelockEnv();   // 준비 깨지면 1단계 재잠금
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -125,6 +126,11 @@ async function selectProject(id) {
   DIAG = null; DIAG_DONE = false;   // 프로젝트 바뀌면 진단 초기화
   connectSSE(id);
   renderAll();
+  // 선택된 로컬 모델의 실제 존재를 확인 → 준비 깨졌으면 1단계 재잠금
+  const ec = STATE.engine_choices || {};
+  const repos = [ec.image_repo, ec.mesh_repo].filter(Boolean);
+  Promise.all(repos.map((r) => (MODEL_PRESENT[r] === undefined ? checkPresence(r) : null)))
+    .then(() => { maybeRelockEnv(); renderFlowList(); });
 }
 
 function connectSSE(id) {
@@ -799,6 +805,30 @@ function meshEngineReady() {
   return !!repo && MODEL_PRESENT[repo] === true;
 }
 function enginesReady() { return imageEngineReady() && meshEngineReady(); }
+// 확실히 '준비 안 됨'인가 (확인중 undefined 는 제외 — 재잠금 오작동 방지)
+function envDefinitelyNotReady() {
+  const ec = STATE.engine_choices || {};
+  const ie = ec.image;
+  if (!ie) return true;
+  if (/gpt-image/i.test(ie)) { if (!openaiKeyOk()) return true; }
+  else { if (!ec.image_repo) return true; if (MODEL_PRESENT[ec.image_repo] === false) return true; }
+  const me = ec.mesh_3d;
+  if (!me) return true;
+  if (isCloudMesh(me)) { if (!rodinKeyOk()) return true; }
+  else { if (!ec.mesh_repo) return true; if (MODEL_PRESENT[ec.mesh_repo] === false) return true; }
+  return false;
+}
+// 준비가 깨졌는데 env 게이트가 통과 상태면 다시 잠금 (제대로 강제)
+async function maybeRelockEnv() {
+  const st = (STATE.steps || {}).env;
+  if (st && st.gate_passed && envDefinitelyNotReady()) {
+    try {
+      STATE = await postJSON(`/api/projects/${PID}/ungate`, { step: "env" });
+      renderFlowList();
+      if (SELECTED !== "env") { SELECTED = "env"; renderCenter(); }
+    } catch (e) {}
+  }
+}
 window.chooseMeshEngine = async (v) => {
   STATE = await postJSON(`/api/projects/${PID}/engine`, { key: "mesh_3d", value: v });
   updateReadyUI();   // 부분 갱신
