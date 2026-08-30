@@ -162,6 +162,7 @@ code{font-family:var(--mono);font-size:12px;background:#0c0f13;border:1px solid 
 .diag-row.irrelevant{opacity:.38}
 .diag-row.irrelevant .box{border-style:dashed;color:var(--faint)}
 .diag-row.irrelevant .nd{font-style:normal;color:var(--faint)}
+.diag-row .later-tag{flex:none;font-size:10.5px;font-family:var(--mono);color:var(--faint);border:1px dashed var(--line);border-radius:10px;padding:2px 8px}
 .diag-row .guide-btn{flex:none;padding:3px 10px;font-size:11px;background:#122029;border:1px solid #2b4a5a;color:var(--accent)}
 .diag-row .guide-btn:hover{background:#16303d}
 /* 이미지 엔진 선택 */

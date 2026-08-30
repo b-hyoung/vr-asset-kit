@@ -447,8 +447,16 @@ function buildDiagStages(data, pending) {
       const st = pending ? "pending" : (!rel ? "irrelevant" : (i.ok ? "ok" : (i.required ? "req" : "warn")));
       const icon = st === "ok" ? "✓" : st === "req" ? "✕" : st === "warn" ? "!" : st === "irrelevant" ? "–" : "";
       const detail = !rel ? "현재 엔진 선택엔 불필요" : (pending ? (i.need || "") : (i.detail || ""));
-      const guideBtn = (!pending && rel && !i.ok && i.guide) ? `<button class="btn small guide-btn" onclick="openGuide('${escapeAttr(i.name)}')">설치</button>` : "";
-      h += `<div class="diag-row ${st}" title="${escapeAttr(detail)}"><div class="box">${icon}</div><div class="grow"><div class="nm">${escapeHtml(i.name)}${(i.required && rel) ? '<span class="diag-star">★</span>' : ''}</div><div class="nd">${escapeHtml(detail)}</div></div>${guideBtn}</div>`;
+      let tail = "";
+      if (!pending && rel && !i.ok) {
+        if (i.runtime) {
+          tail = `<span class="later-tag" title="에디터를 열면 자동으로 확인됩니다">나중에 확인</span>`;
+        } else if (i.guide) {
+          const lbl = AUTO_INSTALL.has(i.name) ? "설치" : "설치법";
+          tail = `<button class="btn small guide-btn" onclick="openGuide('${escapeAttr(i.name)}')">${lbl}</button>`;
+        }
+      }
+      h += `<div class="diag-row ${st}" title="${escapeAttr(detail)}"><div class="box">${icon}</div><div class="grow"><div class="nm">${escapeHtml(i.name)}${(i.required && rel) ? '<span class="diag-star">★</span>' : ''}</div><div class="nd">${escapeHtml(detail)}</div></div>${tail}</div>`;
     }
     if (s.key === "image" && !pending) h += `<div id="imgChooserWrap">${imageChooser()}</div>`;
     if (s.key === "mesh" && !pending) h += `<div id="meshChooserWrap">${meshChooser()}</div>`;
@@ -758,7 +766,7 @@ window.openGuide = (name) => {
   $("docModalTitle").textContent = "🛠 설치 — " + name;
   let extra = "";
   if (AUTO_INSTALL.has(name)) {
-    const wingetItem = /node|git|Blender/i.test(name);
+    const wingetItem = /node|git|Blender|Unreal Engine/i.test(name);
     const warn = (wingetItem && !WINGET) ? " (winget 미설치 — 아래 수동 가이드 이용)" : "";
     extra = `<div class="inst-box">
       <button class="btn gate" id="instBtn" onclick="runInstall('${escapeAttr(name)}')" ${(wingetItem && !WINGET) ? "disabled" : ""}>⚡ 지금 설치</button>

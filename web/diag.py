@@ -114,8 +114,9 @@ GUIDES = {
         "**확인**\n- 저장 후 **다시 진단** → OK.",
     "Unreal Engine":
         "## Unreal Engine\n"
-        "**설치**\n1. **Epic Games Launcher** 설치: https://store.epicgames.com/download\n"
-        "2. Launcher → Unreal Engine → **5.x 설치**(프로젝트 버전에 고정)\n\n"
+        "**설치**\n"
+        "- **⚡지금 설치**는 winget으로 **Epic Games Launcher**를 깝니다.\n"
+        "- 그다음 런처에서 **Unreal Engine 5.x 설치**(프로젝트 버전에 고정) — 엔진 본체는 런처 GUI로.\n\n"
         "**확인**\n- `C:\\Program Files\\Epic Games\\UE_5.x` 폴더 존재.",
     "unrealclaude MCP 등록":
         "## UnrealClaude MCP 등록\n"
@@ -159,11 +160,16 @@ DEP = {
 }
 
 
+# 런타임 상태(설치 대상 아님 — 나중에 에디터 열면 확인)
+RUNTIME = {"Unreal 에디터 실행중", "REST :3000 (execute_script)"}
+
+
 def _attach_meta(items):
     for it in items:
         it["stage"] = NAME_STAGE.get(it["name"], "base")
         it["guide"] = GUIDES.get(it["name"], "")
         it["dep"] = DEP.get(it["name"], "always")
+        it["runtime"] = it["name"] in RUNTIME
     return items
 
 

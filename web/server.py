@@ -56,6 +56,8 @@ INSTALL_CMDS = {
              "--accept-package-agreements", "--accept-source-agreements"]],
     "Blender (선택·분석)": [["winget", "install", "-e", "--id", "BlenderFoundation.Blender",
                           "--accept-package-agreements", "--accept-source-agreements"]],
+    "Unreal Engine": [["winget", "install", "-e", "--id", "EpicGames.EpicGamesLauncher",
+                       "--accept-package-agreements", "--accept-source-agreements"]],
 }
 INSTALL_STATE = {}          # item -> {"running":bool, "code":int|None, "lines":[...]}
 _install_lock = threading.Lock()
