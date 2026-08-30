@@ -171,7 +171,7 @@ def _get_pipe(repo, st):
     return pipe
 
 
-def _run_spectrum(engine, repo, topic, bg):
+def _run_spectrum(engine, repo, topic, bg, pid=None):
     st = SPECTRUM_STATE
     st["images"], st["error"], st["log"] = None, None, []
     try:
@@ -227,6 +227,16 @@ def _run_spectrum(engine, repo, topic, bg):
         st["error"] = str(e)[:200]
     finally:
         st["running"] = False
+        # 생성된 이미지를 프로젝트 state에 저장 (새로고침·확정취소해도 유지, 재생성/재과금 방지)
+        if pid and st.get("images"):
+            try:
+                s = load_state(pid)
+                if s is not None:
+                    s["spectrum"] = {"repo": repo, "engine": engine, "topic": topic,
+                                     "background": bg, "images": st["images"]}
+                    save_state(pid, s)
+            except Exception:
+                pass
 
 
 def _openai_key():
@@ -578,7 +588,7 @@ class Handler(BaseHTTPRequestHandler):
                 SPECTRUM_STATE.update({"running": True, "images": None, "error": None, "log": []})
             engine = body.get("engine", ""); repo = body.get("repo", "")
             threading.Thread(target=_run_spectrum,
-                             args=(engine, repo, body.get("topic", ""), body.get("background", "")),
+                             args=(engine, repo, body.get("topic", ""), body.get("background", ""), body.get("pid")),
                              daemon=True).start()
             return self._json({"started": True, "mode": ("cloud" if "gpt-image" in (engine or "").lower() else "local")})
 
@@ -632,6 +642,16 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 out = json.load(_urlreq.urlopen(req, timeout=45))
                 data = json.loads(out["choices"][0]["message"]["content"])
+                # 추천을 프로젝트 state에 저장 (재요청/재과금 방지)
+                pid = body.get("pid")
+                if pid:
+                    try:
+                        s = load_state(pid)
+                        if s is not None:
+                            s["asset_suggestions"] = data.get("categories", [])
+                            save_state(pid, s)
+                    except Exception:
+                        pass
                 return self._json(data)
             except Exception as e:
                 return self._json({"error": "제안 실패: " + str(e)[:150]}, 500)

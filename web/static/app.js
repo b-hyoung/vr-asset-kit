@@ -125,7 +125,7 @@ async function selectProject(id) {
   STATE = await api(`/api/projects/${id}/state`);
   SELECTED = STATE.current_step;
   DIAG = null; DIAG_DONE = false;   // 프로젝트 바뀌면 진단 초기화
-  ASSET_SUGGESTIONS = null;         // 에셋 추천도 초기화
+  ASSET_SUGGESTIONS = (STATE.asset_suggestions && STATE.asset_suggestions.length) ? STATE.asset_suggestions : null;  // 저장된 추천 복원
   connectSSE(id);
   renderAll();
   // 선택된 로컬 모델의 실제 존재를 확인 → 준비 깨졌으면 1단계 재잠금
@@ -358,7 +358,7 @@ function anchorChooser(locked) {
       <button type="button" class="btn small" onclick="genSpectrum(this)">🖼 강도별 4장 이미지 생성</button>
       <button type="button" class="btn small ghost" onclick="suggestAnchor(this)">🤖 설명만 생성</button>
     </div>
-    <div id="spectrumImgs" class="spectrum-grid"></div>`;
+    <div id="spectrumImgs" class="spectrum-grid">${savedSpectrumHtml()}</div>`;
   }
   return h + `</div>`;
 }
@@ -369,6 +369,17 @@ window.setAnchor = async (name) => {
   document.querySelectorAll(".spec-card").forEach((el) => el.classList.toggle("on", el.dataset.name === name));
   renderFlowList(); updateGateButtons();
 };
+// state에 저장된 스펙트럼 이미지 (새로고침·확정취소해도 유지)
+function savedSpectrumHtml() {
+  const sp = STATE.spectrum;
+  if (!sp || !sp.images || !sp.images.length) return "";
+  const cur = (STATE.inputs || {}).anchor || "";
+  return sp.images.map((im) =>
+    `<button class="spec-card ${cur === im.name ? "on" : ""}" data-name="${im.name}" onclick="setAnchor('${im.name}')">
+      <img src="data:image/png;base64,${im.b64}" alt="${escapeAttr(im.name)}">
+      <span class="spec-name">${escapeHtml(im.name)}</span>
+    </button>`).join("");
+}
 function renderSpecImages(images) {
   const box = $("spectrumImgs"); if (!box) return;
   const cur = (STATE.inputs || {}).anchor || "";
@@ -403,7 +414,7 @@ window.genSpectrum = async (btn) => {
   if (btn) { btn.disabled = true; btn.textContent = "🖼 생성 중…"; }
   if (box) box.innerHTML = `<span class="hint">${isCloud ? "gpt-image로 생성 중…" : "로컬(" + escapeHtml(repo) + ")로 생성 중… 모델 로딩 포함, 몇 분 걸릴 수 있어요"}</span><pre id="specLog" class="inst-log" style="display:block"></pre>`;
   try {
-    const s = await postJSON("/api/spectrum", { topic: inp.topic || "", background: inp.background || "", engine, repo });
+    const s = await postJSON("/api/spectrum", { topic: inp.topic || "", background: inp.background || "", engine, repo, pid: PID });
     if (s.error) throw new Error(s.error);
     // 폴링
     while (true) {
@@ -1183,7 +1194,7 @@ window.suggestAssets = async () => {
   const inp = STATE.inputs || {};
   box.innerHTML = `<span class="hint">🤖 추천 생성 중…</span>`;
   try {
-    const d = await postJSON("/api/suggest-assets", { topic: inp.topic || "", background: inp.background || "", anchor: inp.anchor || "" });
+    const d = await postJSON("/api/suggest-assets", { topic: inp.topic || "", background: inp.background || "", anchor: inp.anchor || "", pid: PID });
     if (d.error) { box.innerHTML = `<span class="hint" style="color:var(--warn)">${escapeHtml(d.error)}</span>`; return; }
     ASSET_SUGGESTIONS = d.categories || [];
     paintAssetSuggest();
