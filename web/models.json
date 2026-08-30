@@ -1,0 +1,19 @@
+{
+  "note": "이미지 로컬 모델 카탈로그. UI에서 리스트로 선택(hover 시 desc 툴팁). 편집 가능.",
+  "image": [
+    { "repo": "black-forest-labs/FLUX.1-schnell", "name": "FLUX.1 schnell", "tags": ["빠름", "가벼움", "자유"],
+      "desc": "4스텝으로 빠르게. 라이선스 관대(Apache-2.0). 입문·프로토타이핑에 추천." },
+    { "repo": "black-forest-labs/FLUX.1-dev", "name": "FLUX.1 dev", "tags": ["고품질", "게이트"],
+      "desc": "높은 품질·프롬프트 정확도. 게이트(라이선스 동의+토큰). 범용 고급." },
+    { "repo": "black-forest-labs/FLUX.2-dev", "name": "FLUX.2 dev", "tags": ["최신", "최고화질", "대용량", "게이트"],
+      "desc": "최신·최고 화질. 대용량이라 16GB VRAM은 fp8 권장. 게이트." },
+    { "repo": "stabilityai/stable-diffusion-3.5-large", "name": "SD 3.5 Large", "tags": ["생태계", "게이트"],
+      "desc": "LoRA/ControlNet 생태계 최강. 파인튜닝·커스텀에 유리. 게이트." },
+    { "repo": "stabilityai/stable-diffusion-3.5-medium", "name": "SD 3.5 Medium", "tags": ["가벼움", "게이트"],
+      "desc": "SD3.5 경량판. 더 가볍고 빠름. 게이트." },
+    { "repo": "stabilityai/stable-diffusion-xl-base-1.0", "name": "SDXL 1.0", "tags": ["범용", "방대한 LoRA", "자유"],
+      "desc": "성숙한 범용 모델. 커뮤니티 LoRA·파인튜닝 방대. 비교적 가벼움." },
+    { "repo": "Qwen/Qwen-Image", "name": "Qwen-Image", "tags": ["텍스트렌더", "자유"],
+      "desc": "이미지 속 글자(한/영) 렌더 최강. Apache-2.0(상업 자유). 포스터·간판류." }
+  ]
+}

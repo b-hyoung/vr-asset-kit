@@ -175,6 +175,18 @@ code{font-family:var(--mono);font-size:12px;background:#0c0f13;border:1px solid 
 .io-tag{font-size:10px;font-family:var(--mono);padding:1px 7px;border-radius:10px;border:1px solid var(--line);flex:none}
 .io-tag.local{color:var(--good);border-color:#2b5a3d}
 .io-tag.key{color:var(--warn);border-color:#5a4a2b}
+/* 모델 카탈로그 선택 */
+.model-pick{margin-top:6px}
+.model-list{display:flex;flex-direction:column;gap:5px}
+.model-opt{display:flex;gap:9px;align-items:flex-start;width:100%;text-align:left;background:#0c0f13;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--dim);cursor:pointer}
+.model-opt:hover{border-color:var(--accent)}
+.model-opt.on{border-color:var(--accent);background:#122029;color:var(--ink)}
+.model-opt .io-dot{color:var(--accent);font-size:11px;flex:none;margin-top:2px}
+.mo-main{flex:1;min-width:0}
+.mo-name{font-size:13px;font-weight:700;color:var(--ink)}
+.mo-repo{font-size:10.5px;font-family:var(--mono);color:var(--faint)}
+.mo-tags{margin-top:3px;display:flex;flex-wrap:wrap;gap:4px}
+.mtag{font-size:9.5px;font-family:var(--mono);color:var(--dim);border:1px solid var(--line);border-radius:9px;padding:0 6px}
 .key-row{display:flex;gap:6px;margin-top:6px}
 .key-row input{flex:1;background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:7px 9px;font-family:var(--mono);font-size:12px}
 .ic-status{margin-top:7px;font-size:12px;font-family:var(--mono)}

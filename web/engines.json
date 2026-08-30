@@ -3,8 +3,8 @@
   "roles": {
     "image": {
       "label": "이미지 생성",
-      "choices": ["FLUX (로컬)", "다른 HF 모델 (직접입력)", "gpt-image-1"],
-      "default": "FLUX (로컬)"
+      "choices": ["로컬 모델", "gpt-image-1"],
+      "default": "로컬 모델"
     },
     "mesh_3d": {
       "label": "3D 생성 (이미지→3D)",

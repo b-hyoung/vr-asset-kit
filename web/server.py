@@ -272,6 +272,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(read_json(FLOW_PATH, {"steps": []}))
         if p == "/api/engines":
             return self._json(read_json(ENGINES_PATH, {}))
+        if p == "/api/models":
+            return self._json(read_json(os.path.join(BASE, "models.json"), {"image": []}))
         if p == "/api/examples":
             names = []
             if os.path.isdir(EXAMPLES_DIR):

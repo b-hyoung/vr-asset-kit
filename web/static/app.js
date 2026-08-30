@@ -15,6 +15,7 @@ let DOC_REF = "";      // 현재 문서 ref
 let COLLAPSED = {};    // 스테이지 접힘 상태(사용자 토글). 없으면 '완료 시 접힘' 기본
 let AUTO_INSTALL = new Set();  // 그 자리 설치 가능한 항목
 let WINGET = false;
+let MODELS = { image: [] };    // 이미지 모델 카탈로그
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // 스크롤 위치 보존(재렌더 시 위로 튀는 것 방지)
@@ -50,6 +51,7 @@ async function init() {
   [FLOW, ENGINES] = await Promise.all([api("/api/flow"), api("/api/engines")]);
   try { EXAMPLES = (await api("/api/examples")).examples || []; } catch (e) { EXAMPLES = []; }
   try { const a = await api("/api/install/available"); AUTO_INSTALL = new Set(a.items || []); WINGET = !!a.winget; } catch (e) {}
+  try { MODELS = await api("/api/models"); } catch (e) { MODELS = { image: [] }; }
 
   $("newProjectBtn").onclick = onNewProject;
   $("editFlowBtn").onclick = openFlowEditor;
@@ -458,21 +460,25 @@ function imageChooser() {
       <span class="io-dot">${on ? "●" : "○"}</span><span class="io-name">${escapeHtml(c)}</span>${needKey ? '<span class="io-tag key">🔑 키필요</span>' : '<span class="io-tag local">로컬</span>'}</button>`;
   }
 
-  // 로컬 엔진: 모델 선택(프리셋/커스텀) + 설치
+  // 로컬 엔진: 카탈로그에서 모델 선택(hover 설명) + 직접입력
   if (cur && !/gpt-image/i.test(cur)) {
-    h += `<div class="model-pick">`;
-    if (/flux/i.test(cur)) {
-      h += `<div class="hint" style="margin-bottom:4px">FLUX 모델 선택:</div><select id="imgRepoSel" onchange="setImageRepo(this.value)">
-        <option value="">— 선택 —</option>` +
-        FLUX_PRESETS.map((p) => `<option value="${p}" ${p === repo ? "selected" : ""}>${p.split("/")[1]}</option>`).join("") +
-        `</select>`;
-    } else {
-      h += `<div class="hint" style="margin-bottom:4px">HF 모델 id (org/name):</div>
-        <div style="display:flex;gap:6px">
-          <input id="imgRepoInput" value="${escapeAttr(repo)}" placeholder="예: stabilityai/stable-diffusion-3.5-large" style="flex:1;background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px">
-          <button class="btn small" onclick="setImageRepo((document.getElementById('imgRepoInput')||{}).value)">설정</button>
-        </div>`;
+    h += `<div class="model-pick"><div class="hint" style="margin-bottom:6px">모델 선택 (마우스를 올리면 설명):</div>`;
+    h += `<div class="model-list">`;
+    for (const m of (MODELS.image || [])) {
+      const on = m.repo === repo;
+      const tags = (m.tags || []).map((t) => `<span class="mtag">${escapeHtml(t)}</span>`).join("");
+      h += `<button class="model-opt ${on ? "on" : ""}" title="${escapeAttr(m.desc || "")}" onclick="setImageRepo('${escapeAttr(m.repo)}')">
+        <span class="io-dot">${on ? "●" : "○"}</span>
+        <span class="mo-main"><span class="mo-name">${escapeHtml(m.name)}</span> <span class="mo-repo">${escapeHtml(m.repo)}</span><div class="mo-tags">${tags}</div></span>
+      </button>`;
     }
+    h += `</div>`;
+    // 직접 입력 (목록에 없는 모델)
+    const inList = (MODELS.image || []).some((m) => m.repo === repo);
+    h += `<div style="display:flex;gap:6px;margin-top:6px">
+        <input id="imgRepoInput" value="${(!inList && repo) ? escapeAttr(repo) : ""}" placeholder="직접 입력: org/name (예: Qwen/Qwen-Image)" style="flex:1;background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px">
+        <button class="btn small" onclick="setImageRepo((document.getElementById('imgRepoInput')||{}).value)">직접 설정</button>
+      </div>`;
     if (repo) {
       const it = DIAG && (DIAG.items || []).find((i) => i.name === "이미지 모델 (로컬)");
       const ok = !!(it && it.ok);
