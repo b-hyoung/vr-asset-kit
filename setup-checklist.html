@@ -1,0 +1,668 @@
+<title>제작 환경 프리플라이트</title>
+<style>
+  :root {
+    --ground:      #EFF2F6;
+    --surface:     #FFFFFF;
+    --surface-2:   #E4E9F0;
+    --ink:         #12161D;
+    --ink-2:       #4B5665;
+    --ink-3:       #7E8899;
+    --line:        #D5DCE6;
+    --line-2:      #C2CBD8;
+    --accent:      #2A5695;
+    --accent-soft: #E2EAF7;
+    --ok:          #2C7355;
+    --ok-soft:     #DFEDE6;
+    --wait:        #8F6412;
+    --wait-soft:   #F5EAD2;
+    --halt:        #A63A31;
+    --halt-soft:   #F7E3E1;
+
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", "JetBrains Mono", Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
+            "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", system-ui, sans-serif;
+
+    --w: 60rem;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0D1015;
+      --surface:     #14181F;
+      --surface-2:   #1C222B;
+      --ink:         #E4E9F1;
+      --ink-2:       #A3AEBE;
+      --ink-3:       #6C7787;
+      --line:        #262D38;
+      --line-2:      #343D4A;
+      --accent:      #7EA8E6;
+      --accent-soft: #172231;
+      --ok:          #63C494;
+      --ok-soft:     #14251C;
+      --wait:        #DBA544;
+      --wait-soft:   #2A2113;
+      --halt:        #E67A70;
+      --halt-soft:   #2B1715;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #0D1015;
+    --surface:     #14181F;
+    --surface-2:   #1C222B;
+    --ink:         #E4E9F1;
+    --ink-2:       #A3AEBE;
+    --ink-3:       #6C7787;
+    --line:        #262D38;
+    --line-2:      #343D4A;
+    --accent:      #7EA8E6;
+    --accent-soft: #172231;
+    --ok:          #63C494;
+    --ok-soft:     #14251C;
+    --wait:        #DBA544;
+    --wait-soft:   #2A2113;
+    --halt:        #E67A70;
+    --halt-soft:   #2B1715;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: var(--w); margin: 0 auto; padding: 0 1.5rem 5rem; }
+
+  /* ---------- masthead ---------- */
+  .mast {
+    padding: 3.5rem 0 1.75rem;
+    border-bottom: 2px solid var(--ink);
+    display: flex; flex-wrap: wrap; gap: 1.5rem;
+    align-items: flex-end; justify-content: space-between;
+  }
+  .eyebrow {
+    font-family: var(--mono); font-size: .7rem; font-weight: 600;
+    letter-spacing: .16em; text-transform: uppercase; color: var(--accent);
+    margin: 0 0 .6rem;
+  }
+  h1 {
+    font-family: var(--mono);
+    font-size: clamp(1.6rem, 4.2vw, 2.35rem);
+    font-weight: 700; letter-spacing: -.02em; line-height: 1.1;
+    margin: 0; text-wrap: balance;
+  }
+  .mast p { margin: .7rem 0 0; color: var(--ink-2); max-width: 42ch; font-size: .94rem; }
+
+  /* ---------- gauge ---------- */
+  .gauge { flex: 0 0 auto; min-width: 13rem; }
+  .gauge-num {
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: 2.35rem; font-weight: 700; line-height: 1; letter-spacing: -.03em;
+  }
+  .gauge-num span { font-size: 1.1rem; font-weight: 500; color: var(--ink-3); }
+  .gauge-label {
+    font-family: var(--mono); font-size: .68rem; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ink-3); margin-top: .4rem;
+  }
+  .bar {
+    height: 5px; background: var(--surface-2); margin-top: .75rem;
+    display: flex; gap: 2px; overflow: hidden;
+  }
+  .bar i { display: block; height: 100%; transition: flex-grow .35s ease; }
+  .bar .f-ok { background: var(--ok); }
+  .bar .f-rest { background: transparent; }
+
+  /* ---------- legend ---------- */
+  .legend {
+    display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    margin: 1.75rem 0 0; padding: 0; list-style: none;
+  }
+  .legend li {
+    background: var(--surface); border: 1px solid var(--line);
+    padding: .85rem 1rem; font-size: .87rem; color: var(--ink-2);
+  }
+  .legend b {
+    display: block; font-family: var(--mono); font-size: .7rem; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink); margin-bottom: .25rem;
+  }
+
+  /* ---------- section ---------- */
+  section { margin-top: 3rem; }
+  .sec-head {
+    display: flex; align-items: baseline; gap: .85rem;
+    padding-bottom: .6rem; border-bottom: 1px solid var(--line-2);
+    flex-wrap: wrap;
+  }
+  .sec-key {
+    font-family: var(--mono); font-size: 1.15rem; font-weight: 700;
+    color: var(--accent); letter-spacing: -.02em;
+  }
+  .sec-head h2 {
+    font-size: 1.12rem; font-weight: 650; margin: 0; letter-spacing: -.01em;
+    flex: 1 1 auto;
+  }
+  .tag {
+    font-family: var(--mono); font-size: .64rem; font-weight: 600;
+    letter-spacing: .1em; text-transform: uppercase;
+    padding: .22rem .5rem; border: 1px solid currentColor; white-space: nowrap;
+  }
+  .tag.once    { color: var(--ink-3); }
+  .tag.session { color: var(--wait); background: var(--wait-soft); border-color: transparent; }
+  .sec-note { font-size: .87rem; color: var(--ink-2); margin: .8rem 0 0; }
+
+  /* ---------- items ---------- */
+  .items { list-style: none; margin: 1rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+  .items li { background: var(--surface); border: 1px solid var(--line); }
+  .items li + li { border-top: none; }
+
+  .row {
+    display: grid; grid-template-columns: 2.6rem 1fr; align-items: start;
+    padding: .9rem 1rem; cursor: pointer; gap: 0;
+  }
+  .row:hover { background: var(--accent-soft); }
+  .row input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .lamp {
+    width: 1.15rem; height: 1.15rem; border: 1.5px solid var(--line-2);
+    border-radius: 50%; margin-top: .22rem; flex: none;
+    display: grid; place-items: center; transition: all .18s ease;
+  }
+  .lamp::after {
+    content: ""; width: .5rem; height: .5rem; border-radius: 50%;
+    background: transparent; transition: background .18s ease;
+  }
+  .row input:focus-visible + .lamp { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .row input:checked + .lamp { border-color: var(--ok); background: var(--ok-soft); }
+  .row input:checked + .lamp::after { background: var(--ok); }
+
+  .body-col { min-width: 0; }
+  .name { font-weight: 600; font-size: .96rem; letter-spacing: -.005em; }
+  .row input:checked ~ .body-col .name { color: var(--ink-3); text-decoration: line-through; text-decoration-thickness: 1px; }
+  .desc { font-size: .87rem; color: var(--ink-2); margin-top: .2rem; }
+  code {
+    font-family: var(--mono); font-size: .84em;
+    background: var(--surface-2); padding: .1em .38em; color: var(--ink);
+    border-radius: 2px; word-break: break-word;
+  }
+  .cmd {
+    font-family: var(--mono); font-size: .8rem; color: var(--ink-2);
+    background: var(--surface-2); padding: .45rem .6rem; margin-top: .5rem;
+    overflow-x: auto; white-space: pre;
+  }
+
+  /* ---------- callout ---------- */
+  .trap { margin: 0; padding: .8rem 1rem; background: var(--halt-soft); border: 1px solid var(--line); border-top: none; }
+  .trap b {
+    font-family: var(--mono); font-size: .66rem; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--halt); display: block; margin-bottom: .2rem;
+  }
+  .trap p { margin: 0; font-size: .87rem; color: var(--ink-2); }
+  .trap p + p { margin-top: .45rem; }
+
+  /* ---------- table ---------- */
+  .tw { overflow-x: auto; margin-top: 1rem; border: 1px solid var(--line); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 40rem; font-size: .86rem; }
+  th, td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th {
+    font-family: var(--mono); font-size: .66rem; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-3); font-weight: 600;
+    background: var(--surface-2); border-bottom: 1px solid var(--line-2);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td strong { font-weight: 650; }
+  .mono-cell { font-family: var(--mono); font-size: .82rem; white-space: nowrap; }
+
+  /* ---------- controls ---------- */
+  .ctrl { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: 1rem; }
+  button {
+    font-family: var(--mono); font-size: .74rem; letter-spacing: .06em;
+    text-transform: uppercase; font-weight: 600;
+    background: var(--surface); color: var(--ink-2);
+    border: 1px solid var(--line-2); padding: .5rem .85rem; cursor: pointer;
+    transition: all .15s ease;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- flow ---------- */
+  .flow { margin-top: 1rem; display: flex; flex-direction: column; gap: 1px; }
+  .step {
+    display: grid; grid-template-columns: 2.2rem 1fr; gap: .8rem;
+    background: var(--surface); border: 1px solid var(--line); padding: .8rem 1rem;
+  }
+  .step + .step { border-top: none; }
+  .step-n {
+    font-family: var(--mono); font-size: .95rem; font-weight: 700; color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .step-t { font-weight: 600; font-size: .93rem; }
+  .step-d { font-size: .85rem; color: var(--ink-2); margin-top: .15rem; }
+  .step.crit { background: var(--wait-soft); }
+  .step.crit .step-n { color: var(--wait); }
+
+  .nope { list-style: none; padding: 0; margin: 1rem 0 0; display: flex; flex-direction: column; gap: .4rem; }
+  .nope li { font-size: .89rem; color: var(--ink-2); padding-left: 1.5rem; position: relative; }
+  .nope li::before {
+    content: "✕"; position: absolute; left: 0; top: 0;
+    color: var(--halt); font-family: var(--mono); font-weight: 700; font-size: .82rem;
+  }
+
+  footer {
+    margin-top: 3.5rem; padding-top: 1.5rem; border-top: 2px solid var(--ink);
+    font-size: .86rem; color: var(--ink-2);
+  }
+  footer h2 { font-family: var(--mono); font-size: .74rem; letter-spacing: .13em; text-transform: uppercase; color: var(--ink); margin: 0 0 .7rem; }
+  footer ul { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: .3rem; }
+  .src { margin-top: 1.5rem; font-family: var(--mono); font-size: .74rem; color: var(--ink-3); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  @media (max-width: 34rem) {
+    .row { grid-template-columns: 2.2rem 1fr; padding: .8rem .75rem; }
+    .mast { padding-top: 2.5rem; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <div>
+      <p class="eyebrow">VR-HARNESS · SETUP.MD</p>
+      <h1>제작 환경 프리플라이트</h1>
+      <p>루프를 시작하기 전에 통과해야 하는 목록. 준비 없이 시작하면 에셋을 다 만든 뒤 임포트 단계에서 멈춘다.</p>
+    </div>
+    <div class="gauge">
+      <div class="gauge-num"><b id="done">0</b><span id="total">/0</span></div>
+      <div class="gauge-label">통과 항목</div>
+      <div class="bar"><i class="f-ok" id="fill" style="flex-grow:0"></i><i class="f-rest" id="rest" style="flex-grow:1"></i></div>
+    </div>
+  </header>
+
+  <ul class="legend">
+    <li><b>1회 설정</b>이 PC에서 한 번 하면 끝. A · B · C 구간.</li>
+    <li><b>매 세션</b>앱을 껐다 켜면 다시 확인해야 함. D 구간이 여기.</li>
+    <li><b>가장 흔한 실패</b>설치 문제가 아니라 <strong>앱이 안 떠 있는 것</strong>.</li>
+  </ul>
+
+  <!-- ============ A ============ -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-key">A</span>
+      <h2>로컬 소프트웨어</h2>
+      <span class="tag once">1회 설정</span>
+    </div>
+    <ul class="items" data-group="A">
+      <li><label class="row"><input type="checkbox" data-id="a1"><span class="lamp"></span><span class="body-col">
+        <span class="name">Blender 4.x 이상</span>
+        <span class="desc">절차적 모델링 + 생성된 GLB 임포트를 담당. 3D 생성 모델도 이 안에서 돌아간다.</span>
+        <span class="cmd">blender --version</span>
+      </span></label></li>
+      <li><label class="row"><input type="checkbox" data-id="a2"><span class="lamp"></span><span class="body-col">
+        <span class="name">Unreal Engine — 버전 고정</span>
+        <span class="desc">Epic Launcher에서 설치. 프로젝트를 만들기 <strong>전에</strong> 버전을 확정한다.</span>
+        <span class="cmd">Get-ChildItem "C:\Program Files\Epic Games" -Directory</span>
+      </span></label></li>
+      <li><label class="row"><input type="checkbox" data-id="a3"><span class="lamp"></span><span class="body-col">
+        <span class="name">uv · Node.js · Git</span>
+        <span class="desc">uv는 Blender MCP 설치, Node는 Unreal 브리지, Git은 프로젝트 저장소.</span>
+        <span class="cmd">uv --version ; node --version ; git --version</span>
+      </span></label></li>
+    </ul>
+    <div class="trap">
+      <b>되돌릴 수 없는 함정</b>
+      <p>언리얼 프로젝트는 한번 올린 버전에서 <strong>내려올 수 없다.</strong> 5.8로 연 프로젝트는 5.7에서 열리지 않는다. 다른 PC·팀과 버전을 먼저 맞춘 뒤 프로젝트를 생성한다. 어긋나면 처음부터 다시 만들어야 한다.</p>
+    </div>
+  </section>
+
+  <!-- ============ B ============ -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-key">B</span>
+      <h2>MCP 서버 — Claude가 Blender·Unreal을 조종하는 통로</h2>
+      <span class="tag once">1회 설정</span>
+    </div>
+    <p class="sec-note"><code>claude mcp list</code>로 등록 상태를 본다. 등록만으로는 연결되지 않는다 — 앱이 떠 있어야 한다(D 참고).</p>
+    <ul class="items" data-group="B">
+      <li><label class="row"><input type="checkbox" data-id="b1"><span class="lamp"></span><span class="body-col">
+        <span class="name">B1 · Blender MCP 등록 + 애드온 설치</span>
+        <span class="desc">에셋 생성의 주력. 절차적 모델링 · 기성 에셋 다운로드 · 3D 생성이 모두 이 하나를 통과한다.</span>
+        <span class="cmd">uvx blender-mcp install-addon</span>
+      </span></label></li>
+      <li><label class="row"><input type="checkbox" data-id="b2"><span class="lamp"></span><span class="body-col">
+        <span class="name">B1-b · Blender 사이드바에서 서버 시작</span>
+        <span class="desc">Blender 실행 → 뷰포트 사이드바 <code>N</code> → <strong>BlenderMCP</strong> 탭 → <strong>Start MCP Server</strong> (포트 9876). 쓸 통합을 체크하고 각 키를 이 패널에 입력한다.</span>
+      </span></label></li>
+      <li><label class="row"><input type="checkbox" data-id="b3"><span class="lamp"></span><span class="body-col">
+        <span class="name">B2 · Unreal MCP 브리지 + 플러그인 활성화</span>
+        <span class="desc">임포트 · 배치 · 캡처 담당. 브리지 서버를 등록하고, 대상 프로젝트에서 플러그인을 켠 뒤 에디터를 재시작한다.</span>
+      </span></label></li>
+      <li><label class="row"><input type="checkbox" data-id="b4"><span class="lamp"></span><span class="body-col">
+        <span class="name">B3 · 이미지 생성 경로 확정</span>
+        <span class="desc">OpenAI <code>gpt-image-1</code>(환경변수 키 필요) 또는 계정에 붙은 이미지 생성 MCP(로컬 키 0) 중 하나. <strong>어느 쪽인지 START.md에 적는다.</strong></span>
+      </span></label></li>
+    </ul>
+    <div class="trap">
+      <b>이중 설치 함정</b>
+      <p>Blender MCP는 배포판이 여러 개 있다. 둘 이상 활성화하면 <strong>포트 9876이 충돌</strong>하고 어느 쪽이 응답하는지 알 수 없다. 한쪽만 켠다.</p>
+    </div>
+  </section>
+
+  <!-- ============ B4 : 3D ============ -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-key">B4</span>
+      <h2>3D 생성 모델 — 이미지/텍스트 → GLB</h2>
+      <span class="tag once">1회 설정</span>
+    </div>
+    <p class="sec-note">"이미지→3D" 경로 에셋을 실제로 만드는 엔진. Blender MCP 안에 통합돼 있지만 <strong>각각 키와 모드를 따로 켜야 한다.</strong> 여기가 준비에서 가장 많이 빠지는 구간이다.</p>
+
+    <div class="tw">
+      <table>
+        <thead><tr><th>모델</th><th>모드</th><th>이미지 입력 형식</th><th>키</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td rowspan="2"><strong>Hyper3D Rodin</strong></td><td class="mono-cell">MAIN_SITE</td><td>로컬 <strong>절대경로</strong></td><td>hyper3d.ai</td><td>free_trial 키는 일일 생성 한도</td></tr>
+          <tr><td class="mono-cell">FAL_AI</td><td>이미지 <strong>URL</strong></td><td>fal.ai</td><td>이미지를 어딘가 올려야 함</td></tr>
+          <tr><td rowspan="2"><strong>Hunyuan3D</strong></td><td class="mono-cell">OFFICIAL_API</td><td>로컬 또는 URL</td><td>텐센트 SecretId + SecretKey</td><td>cloud.tencent.com</td></tr>
+          <tr><td class="mono-cell">LOCAL_API</td><td>로컬 또는 URL</td><td>없음 (로컬 구동)</td><td>생성·임포트가 한 단계</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ul class="items" data-group="B4">
+      <li><label class="row"><input type="checkbox" data-id="d1"><span class="lamp"></span><span class="body-col">
+        <span class="name">쓸 모델과 <strong>모드</strong>를 정해 START.md에 기록</span>
+        <span class="desc">모드가 플로우를 바꾼다 — 아래 함정 참고.</span>
+      </span></label></li>
+      <li><label class="row"><input type="checkbox" data-id="d2"><span class="lamp"></span><span class="body-col">
+        <span class="name">모드에 맞는 키를 BlenderMCP 패널에 입력</span>
+        <span class="desc">환경변수가 아니다. Blender UI 안에 들어간다.</span>
+      </span></label></li>
+      <li><label class="row"><input type="checkbox" data-id="d3"><span class="lamp"></span><span class="body-col">
+        <span class="name">Hyper3D vs Hunyuan3D 비교 — <strong>아직 안 함</strong></span>
+        <span class="desc">둘 다 단일 오브젝트에 강한 같은 급. 후삼국에서 "비교 후 결정"으로 남겨두고 실행하지 않았다. 첫 에셋 하나로 양쪽 다 돌려보고 고르는 것이 이 프로젝트의 실제 첫 결정.</span>
+      </span></label></li>
+    </ul>
+
+    <div class="trap">
+      <b>모드가 플로우를 바꾼다</b>
+      <p>Hyper3D를 <code>FAL_AI</code>로 쓰면 생성한 이미지를 <strong>URL로 올려야</strong> 하고, <code>MAIN_SITE</code>면 <strong>파일로 저장</strong>하면 된다.</p>
+      <p>준비 단계에서 모드를 정하지 않으면 이미지를 전부 만든 뒤 3D 변환에서 막힌다.</p>
+    </div>
+
+    <h3 style="font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin:2rem 0 0;">실제 변환 절차 — 비동기 4단</h3>
+    <div class="flow">
+      <div class="step"><span class="step-n">1</span><span><span class="step-t">생성 요청</span><span class="step-d"><code>generate_hyper3d_model_via_images</code> / <code>_via_text</code> / <code>generate_hunyuan3d_model</code></span></span></div>
+      <div class="step"><span class="step-n">2</span><span><span class="step-t">상태 폴링 — 완료까지 대기</span><span class="step-d"><code>poll_rodin_job_status</code> / <code>poll_hunyuan_job_status</code>. 한 번에 끝나지 않는다.</span></span></div>
+      <div class="step"><span class="step-n">3</span><span><span class="step-t">GLB 임포트</span><span class="step-d"><code>import_generated_asset</code> / <code>import_generated_asset_hunyuan</code></span></span></div>
+      <div class="step crit"><span class="step-n">4</span><span><span class="step-t">크기 보정 — 빼먹으면 안 되는 단계</span><span class="step-d"><code>world_bounding_box</code>를 확인해 위치·스케일·회전을 맞춘다. 생성된 GLB는 임의 스케일로 들어온다. <strong>브리프의 실측 크기 판정은 이 보정 뒤에 한다.</strong></span></span></div>
+    </div>
+
+    <h3 style="font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin:2rem 0 0;">생성 모델의 한계 — 시도하지 말 것</h3>
+    <ul class="nope">
+      <li>장면 전체를 한 번에 생성 — 단일 오브젝트 생성기다</li>
+      <li>지면·지형 생성 — 엔진에서 만들거나 기성 에셋을 쓴다</li>
+      <li>부품을 따로 생성해 나중에 조립</li>
+      <li>같은 에셋을 개수만큼 재생성 — 1건 생성 후 <strong>파이썬으로 복제</strong>하고 스케일·회전 지터로 변형</li>
+    </ul>
+    <p class="sec-note">브리프에 "5~7채, 크기 변형 2~3종"이라 적혀 있어도 <strong>생성은 2~3건</strong>이면 된다.</p>
+  </section>
+
+  <!-- ============ B5 ============ -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-key">B5</span>
+      <h2>기성 에셋 소스 — 만들기 전에 가져올 수 있는지 본다</h2>
+      <span class="tag once">1회 설정</span>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>소스</th><th>강점</th><th>키</th></tr></thead>
+        <tbody>
+          <tr><td><strong>PolyHaven</strong></td><td>모델 · 텍스처 · <strong>HDRI 환경광</strong></td><td>불필요</td></tr>
+          <tr><td><strong>Sketchfab</strong></td><td>현실적 모델, 종류가 가장 많음</td><td>API 키 필요 (다운로드 가능 모델만)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="sec-note">환경광(HDRI)은 거의 항상 가져오는 쪽이 맞다. <strong>생성 대상 목록에 HDRI를 넣지 않는다.</strong></p>
+  </section>
+
+  <!-- ============ B6 : 머티리얼 ============ -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-key">B6</span>
+      <h2>머티리얼 · 텍스처 — 표면은 형태와 별개 작업</h2>
+      <span class="tag once">경로별로 다름</span>
+    </div>
+    <p class="sec-note">준비물이 아니라 <strong>플로우</strong>다. 에셋을 어떤 경로로 만들었는지에 따라 해야 할 일이 완전히 달라진다.</p>
+
+    <div class="tw">
+      <table>
+        <thead><tr><th>에셋 경로</th><th>머티리얼 상태</th><th>해야 할 일</th></tr></thead>
+        <tbody>
+          <tr><td>Hyper3D / Hunyuan3D 생성</td><td><strong>포함되어 나옴</strong> — GLB에 PBR 내장</td><td>없음 · 확인만</td></tr>
+          <tr><td>Sketchfab / PolyHaven 모델</td><td><strong>포함되어 나옴</strong></td><td>없음 · 확인만</td></tr>
+          <tr><td><strong>절차적 모델링</strong></td><td><strong>없음</strong> ← 실제 작업 구간</td><td>UV → 텍스처 확보 → 적용</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin:2rem 0 0;">절차적 메시에 표면 입히기 — 3단</h3>
+    <div class="flow">
+      <div class="step crit"><span class="step-n">1</span><span><span class="step-t">UV 언랩 — 반드시 먼저</span><span class="step-d">없으면 텍스처가 늘어나거나 뭉개진다. <code>execute_blender_code</code>로 Smart UV Project 등을 돌린다.</span></span></div>
+      <div class="step"><span class="step-n">2</span><span><span class="step-t">텍스처 확보</span><span class="step-d"><code>download_polyhaven_asset(asset_type="textures")</code> — 맵들이 담긴 머티리얼이 생성된다.</span></span></div>
+      <div class="step"><span class="step-n">3</span><span><span class="step-t">적용</span><span class="step-d"><code>set_texture(object_name, texture_id)</code> — Principled BSDF에 color · roughness · metallic · normal · displacement가 연결된다.</span></span></div>
+    </div>
+
+    <div class="trap">
+      <b>UV 함정 · 소스에서 확인함</b>
+      <p><code>set_texture</code>가 만드는 노드 그래프는 <strong>UV 좌표 출력에 연결</strong>되지만, <code>set_texture</code> 자체는 <strong>UV를 만들지도, 있는지 확인하지도 않는다.</strong></p>
+      <p>절차적으로 만든 메시는 UV가 없거나 엉망인 경우가 많다. 텍스처를 붙였는데 이상하면 머티리얼 문제가 아니라 <strong>UV 문제</strong>다.</p>
+    </div>
+
+    <div class="trap" style="background:var(--wait-soft)">
+      <b style="color:var(--wait)">순서 함정</b>
+      <p>환경광(PolyHaven <strong>HDRI</strong>)을 <strong>먼저</strong> 넣고 나서 머티리얼을 판정한다. 조명 없는 상태에서 표면 합불을 판정하면 나중에 전부 다시 봐야 한다.</p>
+    </div>
+
+    <p class="sec-note">PolyHaven에 맞는 텍스처가 없거나 단색·기본 머티리얼만 필요하면 스크립팅으로 직접 만든다. 초가 지붕처럼 특정한 표면은 텍스처 라이브러리에 없을 수 있다.</p>
+
+    <h3 style="font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin:2rem 0 0;">에셋 소스 우선순위 — 만들기 전에 가져올 수 있는지 본다</h3>
+    <div class="tw">
+      <table>
+        <thead><tr><th>대상</th><th>1순위</th><th>2순위</th></tr></thead>
+        <tbody>
+          <tr><td>특정 실존 오브젝트</td><td>Sketchfab</td><td>PolyHaven</td></tr>
+          <tr><td>일반적 오브젝트 · 가구</td><td>PolyHaven</td><td>Sketchfab</td></tr>
+          <tr><td>라이브러리에 없는 고유 에셋</td><td>Hyper3D / Hunyuan3D 생성</td><td>—</td></tr>
+          <tr><td>환경광</td><td>PolyHaven HDRI</td><td>—</td></tr>
+          <tr><td>머티리얼 · 텍스처</td><td>PolyHaven 텍스처</td><td>스크립팅</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="sec-note"><strong>절차적 모델링은 최후 수단이다.</strong> 라이브러리에 없거나 · 생성이 실패했거나 · 단순 프리미티브거나 · 규칙 기반 반복 구조(모듈 울타리 등)라 스크립팅이 오히려 정확할 때만 쓴다.</p>
+  </section>
+
+  <!-- ============ C ============ -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-key">C</span>
+      <h2>API 키</h2>
+      <span class="tag once">1회 설정</span>
+    </div>
+    <p class="sec-note">키를 <strong>채팅 · 파일 · 커밋에 절대 쓰지 않는다.</strong> 환경변수 또는 각 도구의 설정 UI에만 넣는다.</p>
+    <div class="tw">
+      <table>
+        <thead><tr><th>키</th><th>어디에 넣나</th><th>필요한 경우</th></tr></thead>
+        <tbody>
+          <tr><td class="mono-cell">OPENAI_API_KEY</td><td>시스템 환경변수</td><td>이미지 생성을 OpenAI로 할 때</td></tr>
+          <tr><td>Hyper3D (hyper3d.ai 또는 fal.ai)</td><td><strong>BlenderMCP 패널</strong></td><td>3D 생성을 Hyper3D로 — 모드에 맞는 키</td></tr>
+          <tr><td>Hunyuan3D SecretId + SecretKey</td><td><strong>BlenderMCP 패널</strong></td><td>3D 생성을 Hunyuan3D OFFICIAL_API로</td></tr>
+          <tr><td>Sketchfab</td><td><strong>BlenderMCP 패널</strong></td><td>기성 모델을 Sketchfab에서 받을 때</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="items" data-group="C">
+      <li><label class="row"><input type="checkbox" data-id="c1"><span class="lamp"></span><span class="body-col">
+        <span class="name">환경변수 설정 후 터미널과 Claude Code 재시작</span>
+        <span class="desc">재시작하지 않으면 새 환경변수가 반영되지 않는다.</span>
+      </span></label></li>
+    </ul>
+  </section>
+
+  <!-- ============ D ============ -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-key">D</span>
+      <h2>연결 확인</h2>
+      <span class="tag session">매 세션 · 루프 시작 직전</span>
+    </div>
+    <p class="sec-note">MCP는 Blender·Unreal이 <strong>실행 중일 때만</strong> 연결된다. 앱을 껐다 켜면 처음부터 다시 확인한다.<br>순서: Blender 실행 → 사이드바에서 서버 Start → 언리얼 프로젝트 열기 → 아래 확인.</p>
+    <ul class="items" data-group="D">
+      <li><label class="row"><input type="checkbox" data-id="e1"><span class="lamp"></span><span class="body-col">
+        <span class="name">Blender 연결</span>
+        <span class="desc"><code>get_addon_status</code> → 버전 정보 반환. "Could not connect to Blender"면 Blender 미실행 또는 서버 미시작.</span>
+      </span></label></li>
+      <li><label class="row"><input type="checkbox" data-id="e2"><span class="lamp"></span><span class="body-col">
+        <span class="name">3D 생성 — Hyper3D</span>
+        <span class="desc"><code>get_hyper3d_status</code> → enabled + <strong>모드</strong>(MAIN_SITE / FAL_AI)까지 확인.</span>
+      </span></label></li>
+      <li><label class="row"><input type="checkbox" data-id="e3"><span class="lamp"></span><span class="body-col">
+        <span class="name">3D 생성 — Hunyuan3D</span>
+        <span class="desc"><code>get_hunyuan3d_status</code> → enabled + <strong>모드</strong>(OFFICIAL_API / LOCAL_API)까지 확인.</span>
+      </span></label></li>
+      <li><label class="row"><input type="checkbox" data-id="e4"><span class="lamp"></span><span class="body-col">
+        <span class="name">기성 에셋 — PolyHaven / Sketchfab</span>
+        <span class="desc"><code>get_polyhaven_status</code> · <code>get_sketchfab_status</code></span>
+      </span></label></li>
+      <li><label class="row"><input type="checkbox" data-id="e5"><span class="lamp"></span><span class="body-col">
+        <span class="name">Unreal 연결</span>
+        <span class="desc"><code>unreal_status</code> → connected. "NOT CONNECTED"면 에디터 미실행 또는 플러그인 비활성.</span>
+      </span></label></li>
+      <li><label class="row"><input type="checkbox" data-id="e6"><span class="lamp"></span><span class="body-col">
+        <span class="name">이미지 생성 — 테스트 1장</span>
+        <span class="desc">실제로 나오는지 확인.</span>
+      </span></label></li>
+      <li><label class="row"><input type="checkbox" data-id="e7"><span class="lamp"></span><span class="body-col">
+        <span class="name">3D 생성 왕복 — 테스트 에셋 1개</span>
+        <span class="desc">생성 → 폴링 → 임포트 → 크기 확인까지 한 바퀴. <strong>여기까지 통과해야 루프를 시작할 수 있다.</strong></span>
+      </span></label></li>
+    </ul>
+    <div class="ctrl">
+      <button type="button" id="reset-d">D 구간만 초기화</button>
+      <button type="button" id="reset-all">전체 초기화</button>
+    </div>
+  </section>
+
+  <!-- ============ E ============ -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-key">E</span>
+      <h2>VR 실기 테스트</h2>
+      <span class="tag session">검수 단계에서</span>
+    </div>
+    <p class="sec-note">에셋 제작에는 필요 없다. 장면 검증·실기 확인 단계에서만.</p>
+    <ul class="items" data-group="E">
+      <li><label class="row"><input type="checkbox" data-id="f1"><span class="lamp"></span><span class="body-col">
+        <span class="name">Quest Link / Air Link 또는 무선 스트리밍</span>
+        <span class="desc">PCVR로 확인할 때.</span>
+      </span></label></li>
+      <li><label class="row"><input type="checkbox" data-id="f2"><span class="lamp"></span><span class="body-col">
+        <span class="name">활성 OpenXR 런타임 전환</span>
+        <span class="desc">여러 HMD 런타임(Oculus · SteamVR · PICO 등)이 설치돼 있으면 활성 런타임은 <strong>하나만</strong> 선택된다. Quest로 테스트하려면 Oculus로 전환 — 안 그러면 헤드셋이 아예 잡히지 않는다.</span>
+      </span></label></li>
+      <li><label class="row"><input type="checkbox" data-id="f3"><span class="lamp"></span><span class="body-col">
+        <span class="name">언리얼 VR 템플릿으로 프로젝트 생성</span>
+        <span class="desc">A2에서 고정한 버전으로.</span>
+      </span></label></li>
+    </ul>
+  </section>
+
+  <!-- ============ 미검증 ============ -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-key">?</span>
+      <h2>아직 검증되지 않은 것 — 규칙 아님</h2>
+      <span class="tag session">첫 회전에서 확인</span>
+    </div>
+    <p class="sec-note">후삼국 프로젝트는 하네스 설계까지만 하고 실제 에셋 제작에 들어가지 않았다. 아래는 <strong>확인하지 않은 가정</strong>이므로 사실처럼 취급하지 않는다.</p>
+    <ul class="nope">
+      <li><strong>Blender → 언리얼 머티리얼 이관</strong> — 노드 그래프가 어디까지 옮겨지는지 확인 안 됨. 임포트 후 재작업이 필요할 수 있다</li>
+      <li><strong>Quest 머티리얼·텍스처 예산</strong> — 모바일 GPU 제약(텍스처 해상도, 드로콜, 셰이더 복잡도) 미측정</li>
+      <li><strong>Hyper3D vs Hunyuan3D</strong> — "비교 후 결정"으로 남겨두고 실행하지 않았다</li>
+      <li><strong>자연 배치 수치</strong> — 지터 ±10%, 경사 20°, 재시도 상한 3회는 근거 없는 초기값</li>
+      <li><strong>절차적 모델링 품질</strong> — 초가집·목책이 실제로 쓸 만하게 나오는지 확인 안 됨</li>
+    </ul>
+  </section>
+
+  <footer>
+    <h2>준비 없이 시작하면 생기는 일</h2>
+    <ul>
+      <li>Blender 미실행 → 모든 모델링 호출이 조용히 실패, 원인 찾는 데 시간 낭비</li>
+      <li>언리얼 에디터 미실행 → 에셋은 다 만들었는데 임포트에서 전부 멈춤</li>
+      <li>3D 생성 모드 미확정 → 이미지를 다 만들고 변환 단계에서 막힘</li>
+      <li>크기 보정 생략 → 임의 스케일 메시가 배치돼 실측 판정을 통과할 수 없음</li>
+      <li>UV 없이 텍스처 적용 → 표면이 깨져 보이고 원인을 머티리얼에서 찾게 됨</li>
+      <li>조명 없이 머티리얼 판정 → HDRI 넣은 뒤 전부 다시 판정</li>
+      <li>언리얼 버전 안 맞춤 → 프로젝트를 처음부터 다시 (되돌릴 수 없음)</li>
+    </ul>
+    <p class="src">체크 상태는 이 브라우저에 저장됨 · 원문: vr-harness/SETUP.md · harness/scene-loop.md</p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var KEY = "vrharness.preflight.v2";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-id]'));
+  var state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { state = {}; }
+
+  var doneEl = document.getElementById('done');
+  var totalEl = document.getElementById('total');
+  var fill = document.getElementById('fill');
+  var rest = document.getElementById('rest');
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  function render() {
+    var n = boxes.filter(function (b) { return b.checked; }).length;
+    doneEl.textContent = n;
+    totalEl.textContent = "/" + boxes.length;
+    fill.style.flexGrow = String(n);
+    rest.style.flexGrow = String(boxes.length - n);
+  }
+
+  boxes.forEach(function (b) {
+    b.checked = !!state[b.dataset.id];
+    b.addEventListener('change', function () {
+      state[b.dataset.id] = b.checked;
+      save();
+      render();
+    });
+  });
+
+  function clear(pred) {
+    boxes.forEach(function (b) {
+      if (pred(b)) { b.checked = false; state[b.dataset.id] = false; }
+    });
+    save();
+    render();
+  }
+
+  document.getElementById('reset-all').addEventListener('click', function () {
+    clear(function () { return true; });
+  });
+
+  document.getElementById('reset-d').addEventListener('click', function () {
+    clear(function (b) {
+      var ul = b.closest('ul[data-group]');
+      return !!ul && ul.dataset.group === 'D';
+    });
+  });
+
+  render();
+})();
+</script>
