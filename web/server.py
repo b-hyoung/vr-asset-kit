@@ -22,6 +22,7 @@ import time
 import threading
 import subprocess
 import shutil
+import urllib.request as _urlreq
 import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, unquote
@@ -61,6 +62,22 @@ INSTALL_CMDS = {
 }
 INSTALL_STATE = {}          # item -> {"running":bool, "code":int|None, "lines":[...]}
 _install_lock = threading.Lock()
+
+
+def _openai_key():
+    for p in [os.path.join(BASE, ".env"),
+              os.path.join(os.path.expanduser("~"), "Desktop", "bobs_project", "Core-CBT", ".env")]:
+        try:
+            if os.path.isfile(p):
+                for line in open(p, encoding="utf-8", errors="ignore"):
+                    s = line.strip()
+                    if s.startswith("OPENAI_API_KEY") and "=" in s:
+                        v = s.split("=", 1)[1].strip().strip('"').strip("'")
+                        if v:
+                            return v
+        except Exception:
+            pass
+    return os.environ.get("OPENAI_API_KEY")
 
 
 def _load_env_vars():
@@ -381,6 +398,34 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         p = u.path
         body = self._body_json()
+
+        if p == "/api/suggest-assets":
+            key = _openai_key()
+            if not key:
+                return self._json({"error": "OpenAI 키 필요 — 1단계 환경체크에서 저장하세요"}, 400)
+            topic = body.get("topic", ""); bg = body.get("background", ""); anchor = body.get("anchor", "")
+            if not topic:
+                return self._json({"error": "먼저 주제를 입력하세요"}, 400)
+            prompt = (
+                "VR 장면을 만들려고 한다. 주제: %s / 배경: %s / 스타일앵커: %s.\n"
+                "이 장면에 필요한 3D 에셋을 카테고리별로 제안하라. "
+                "카테고리 예: 건물/구조물, 자연물, 인물·동물, 소품, 이펙트, 지형·바닥. "
+                "각 항목은 짧은 한국어 명사(2~6자). 카테고리당 3~7개. "
+                'JSON만 출력: {"categories":[{"name":"","items":["",""]}]}'
+            ) % (topic, bg, anchor)
+            reqbody = json.dumps({
+                "model": "gpt-4o-mini",
+                "messages": [{"role": "user", "content": prompt}],
+                "response_format": {"type": "json_object"}, "temperature": 0.5,
+            }).encode()
+            req = _urlreq.Request("https://api.openai.com/v1/chat/completions", data=reqbody,
+                                  headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
+            try:
+                out = json.load(_urlreq.urlopen(req, timeout=45))
+                data = json.loads(out["choices"][0]["message"]["content"])
+                return self._json(data)
+            except Exception as e:
+                return self._json({"error": "제안 실패: " + str(e)[:150]}, 500)
 
         if p == "/api/install":
             item = body.get("item")

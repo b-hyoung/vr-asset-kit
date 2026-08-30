@@ -267,6 +267,12 @@ function renderCenter() {
     html += `</div>`;
   }
 
+  // 에셋 단계: AI 제안 (추상적인 빈 목록 → 제안받아 골라 담기)
+  if (s.id === "assets" && !locked) {
+    html += `<button type="button" class="btn small" onclick="suggestAssets()" style="margin-top:6px">🤖 AI로 에셋 제안 받기</button>
+      <div id="assetSuggest" style="margin-top:8px"></div>`;
+  }
+
   // 엔진 선택
   if (s.engines && s.engines.length) {
     html += `<div style="margin-top:10px">`;
@@ -309,19 +315,23 @@ function renderCenter() {
   loadDoc(s.doc_ref);
 }
 
+function assetTagsHtml() {
+  const arr = (STATE.inputs && STATE.inputs.asset_list) || [];
+  if (!arr.length) return `<span class="hint">아직 없음 — 아래 'AI로 제안'으로 담거나 직접 추가</span>`;
+  return arr.map((a, i) => `<span class="chip">${escapeHtml(a)} <b onclick="removeAsset(${i})">✕</b></span>`).join("");
+}
+function refreshAssetTags() {
+  const el = $("assetTags"); if (el) el.innerHTML = assetTagsHtml();
+  updateGateButtons();
+}
 function renderAssetList(val, locked) {
-  const arr = Array.isArray(val) ? val : [];
-  let h = `<div class="field"><label>${labelFor("asset_list")}</label>
+  return `<div class="field"><label>${labelFor("asset_list")} <span class="hint" id="assetCount"></span></label>
     <div style="display:flex;gap:6px">
-      <input id="assetInput" ${locked ? "disabled" : ""} placeholder="에셋 추가 후 Enter" style="flex:1">
+      <input id="assetInput" ${locked ? "disabled" : ""} placeholder="직접 추가 후 Enter" style="flex:1">
       <button class="btn small" ${locked ? "disabled" : ""} onclick="addAsset()">추가</button>
     </div>
-    <div class="tag-list">`;
-  arr.forEach((a, i) => {
-    h += `<span class="chip">${escapeHtml(a)} <b onclick="removeAsset(${i})">✕</b></span>`;
-  });
-  h += `</div></div>`;
-  return h;
+    <div class="tag-list" id="assetTags">${assetTagsHtml()}</div>
+  </div>`;
 }
 
 function renderExampleRef() {
@@ -991,13 +1001,39 @@ window.addAsset = async () => {
   const arr = Array.isArray(STATE.inputs.asset_list) ? STATE.inputs.asset_list.slice() : [];
   arr.push(el.value.trim());
   STATE = await postJSON(`/api/projects/${PID}/input`, { field: "asset_list", value: arr });
-  renderCenter();
+  el.value = "";
+  refreshAssetTags();   // 부분 갱신 (리렌더 없이)
+};
+window.addAssetItem = async (t, btn) => {
+  const arr = Array.isArray(STATE.inputs.asset_list) ? STATE.inputs.asset_list.slice() : [];
+  if (arr.includes(t)) return;
+  arr.push(t);
+  STATE = await postJSON(`/api/projects/${PID}/input`, { field: "asset_list", value: arr });
+  refreshAssetTags();
+  if (btn) { btn.classList.add("added"); btn.textContent = "✓ " + t; }
 };
 window.removeAsset = async (i) => {
   const arr = (STATE.inputs.asset_list || []).slice();
   arr.splice(i, 1);
   STATE = await postJSON(`/api/projects/${PID}/input`, { field: "asset_list", value: arr });
-  renderCenter();
+  refreshAssetTags();
+};
+window.suggestAssets = async () => {
+  const box = $("assetSuggest"); if (!box) return;
+  const inp = STATE.inputs || {};
+  box.innerHTML = `<span class="hint">🤖 제안 생성 중…</span>`;
+  try {
+    const d = await postJSON("/api/suggest-assets", { topic: inp.topic || "", background: inp.background || "", anchor: inp.anchor || "" });
+    if (d.error) { box.innerHTML = `<span class="hint" style="color:var(--warn)">${escapeHtml(d.error)}</span>`; return; }
+    let h = `<div class="hint" style="margin-bottom:4px">제안된 에셋 — 클릭해서 담기 (필요 없는 건 무시)</div>`;
+    for (const c of (d.categories || [])) {
+      const chips = (c.items || []).map((t) => `<button class="idea-chip" onclick="addAssetItem('${escapeAttr(t)}', this)">+ ${escapeHtml(t)}</button>`).join("");
+      h += `<div class="idea-row"><span class="idea-lbl">${escapeHtml(c.name || "")}</span><div class="idea-chips">${chips}</div></div>`;
+    }
+    box.innerHTML = h;
+  } catch (e) {
+    box.innerHTML = `<span class="hint" style="color:var(--bad)">제안 실패: ${e.message}</span>`;
+  }
 };
 
 function updateGateButtons() {
