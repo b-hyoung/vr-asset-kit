@@ -16,6 +16,22 @@ let COLLAPSED = {};    // 스테이지 접힘 상태(사용자 토글). 없으�
 let AUTO_INSTALL = new Set();  // 그 자리 설치 가능한 항목
 let WINGET = false;
 let MODELS = { image: [] };    // 이미지 모델 카탈로그
+let MODEL_PRESENT = {};        // repo -> true/false/undefined(확인중)
+let CHECKING = new Set();      // 존재 확인 진행중 repo (중복 fetch 방지)
+let KEY_SAVED = new Set();     // 이번 세션에 저장한 키(즉시 반영)
+
+async function checkPresence(repo) {
+  if (!repo) return;
+  try { const r = await api("/api/hf/present?repo=" + encodeURIComponent(repo)); MODEL_PRESENT[repo] = !!r.present; }
+  catch (e) { MODEL_PRESENT[repo] = false; }
+}
+// 선택/키 변경 시 전체 리렌더 없이 관련 부분만 갱신 (딸깍 방지)
+function updateReadyUI() {
+  const ic = $("imgChooserWrap"); if (ic) ic.innerHTML = imageChooser();
+  const mc = $("meshChooserWrap"); if (mc) mc.innerHTML = meshChooser();
+  const ef = $("envFlow"); if (ef) ef.outerHTML = envFlowLine();
+  updateGateButtons();
+}
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // 스크롤 위치 보존(재렌더 시 위로 튀는 것 방지)
@@ -330,7 +346,7 @@ function envFlowLine() {
     { t: "3D 엔진", done: meshEngineReady() },
     { t: "확정", done: false },
   ];
-  return `<div class="env-flow">` + steps.map((s, i) =>
+  return `<div class="env-flow" id="envFlow">` + steps.map((s, i) =>
     `<span class="ef ${s.done ? "done" : ""}">${s.done ? "✓" : (i + 1)} ${s.t}</span>`
   ).join(`<span class="ef-sep">→</span>`) + `</div>`;
 }
@@ -428,8 +444,8 @@ function buildDiagStages(data, pending) {
       const guideBtn = (!pending && rel && !i.ok && i.guide) ? `<button class="btn small guide-btn" onclick="openGuide('${escapeAttr(i.name)}')">설치</button>` : "";
       h += `<div class="diag-row ${st}" title="${escapeAttr(detail)}"><div class="box">${icon}</div><div class="grow"><div class="nm">${escapeHtml(i.name)}${(i.required && rel) ? '<span class="diag-star">★</span>' : ''}</div><div class="nd">${escapeHtml(detail)}</div></div>${guideBtn}</div>`;
     }
-    if (s.key === "image" && !pending) h += imageChooser();  // 진단 후: 이미지 엔진 확정
-    if (s.key === "mesh" && !pending) h += meshChooser();    // 진단 후: 3D 엔진 확정
+    if (s.key === "image" && !pending) h += `<div id="imgChooserWrap">${imageChooser()}</div>`;
+    if (s.key === "mesh" && !pending) h += `<div id="meshChooserWrap">${meshChooser()}</div>`;
     return h + `</div></div>`;   // stage-body + diag-stage 닫기
   };
 
@@ -480,10 +496,17 @@ function imageChooser() {
         <button class="btn small" onclick="setImageRepo((document.getElementById('imgRepoInput')||{}).value)">직접 설정</button>
       </div>`;
     if (repo) {
-      const it = DIAG && (DIAG.items || []).find((i) => i.name === "이미지 모델 (로컬)");
-      const ok = !!(it && it.ok);
-      h += `<div class="ic-status ${ok ? "ok" : "wait"}" style="margin-top:8px">${ok ? "✓ 모델 있음: " + escapeHtml(repo) : "미다운로드: " + escapeHtml(repo)}</div>`;
-      if (!ok) {
+      // 진입 시 미확인이면 자동으로 한 번 경량 확인 (중복 방지)
+      if (MODEL_PRESENT[repo] === undefined && !CHECKING.has(repo)) {
+        CHECKING.add(repo);
+        checkPresence(repo).then(() => { CHECKING.delete(repo); updateReadyUI(); });
+      }
+      const pres = MODEL_PRESENT[repo];   // true/false/undefined(확인중)
+      const ok = pres === true;
+      const statusTxt = pres === undefined ? "⏳ 확인 중…"
+        : (ok ? "✓ 모델 있음: " + escapeHtml(repo) : "미다운로드: " + escapeHtml(repo));
+      h += `<div class="ic-status ${ok ? "ok" : "wait"}" style="margin-top:8px">${statusTxt}</div>`;
+      if (pres === false) {
         h += `<button class="btn gate" style="margin-top:6px" onclick="installImageModel()">⚡ 이 모델 설치(다운로드)</button>
           <div class="auth-box" style="margin-top:8px">
             <div class="hint" style="margin-bottom:6px">🔒 게이트 모델이면 토큰+동의 필요</div>
@@ -520,14 +543,17 @@ window.setImageRepo = async (v) => {
   v = (v || "").trim();
   if (!v) return;
   STATE = await postJSON(`/api/projects/${PID}/engine`, { key: "image_repo", value: v });
-  await runDiagnose();               // 선택 모델 존재 여부 재확인
-  keepScroll(() => renderCenter());
+  if (MODEL_PRESENT[v] === undefined) MODEL_PRESENT[v] = undefined; // 확인중 상태
+  updateReadyUI();                    // "확인 중…" 즉시 표시 (전체 리렌더 X)
+  await checkPresence(v);             // 경량 존재 확인
+  updateReadyUI();
 };
 window.installImageModel = () => {
   const repo = (STATE.engine_choices || {}).image_repo;
   if (repo) runInstall("이미지 모델 (로컬)", repo);
 };
 function openaiKeyOk() {
+  if (KEY_SAVED.has("OPENAI_API_KEY")) return true;
   const item = DIAG && (DIAG.items || []).find((i) => i.name === "OPENAI_API_KEY");
   return !!(item && item.ok);
 }
@@ -535,14 +561,15 @@ function imageEngineReady() {
   const ch = (STATE.engine_choices || {}).image;
   if (!ch) return false;
   if (/gpt-image/i.test(ch)) return openaiKeyOk();
-  // 로컬 엔진 = 선택한 모델(repo)이 실제로 받아져 있어야 준비됨
-  if (!(STATE.engine_choices || {}).image_repo) return false;
-  const it = DIAG && (DIAG.items || []).find((i) => i.name === "이미지 모델 (로컬)");
-  return !!(it && it.ok);
+  // 로컬 엔진 = 선택한 모델(repo)이 실제로 받아져 있어야 준비됨 (경량 캐시)
+  const repo = (STATE.engine_choices || {}).image_repo;
+  return !!repo && MODEL_PRESENT[repo] === true;
 }
 window.chooseImageEngine = async (v) => {
   STATE = await postJSON(`/api/projects/${PID}/engine`, { key: "image", value: v });
-  keepScroll(() => renderCenter());
+  const repo = (STATE.engine_choices || {}).image_repo;
+  if (repo && MODEL_PRESENT[repo] === undefined) checkPresence(repo).then(updateReadyUI);
+  updateReadyUI();   // 부분 갱신 (전체 리렌더 X)
 };
 window.saveOpenAIKey = async () => {
   const el = $("openaiKeyInput");
@@ -550,8 +577,8 @@ window.saveOpenAIKey = async () => {
   if (!v) return;
   await postJSON("/api/env", { key: "OPENAI_API_KEY", value: v });
   if (el) el.value = "";
-  await runDiagnose();   // 재진단 → 키 OK 반영
-  keepScroll(() => renderCenter());  // 선택/게이트 갱신 (스크롤 보존)
+  KEY_SAVED.add("OPENAI_API_KEY");   // 즉시 반영 (재진단 없이)
+  updateReadyUI();
 };
 
 // 3D 엔진 선택 (Hunyuan 로컬 / Rodin 클라우드)
@@ -578,6 +605,7 @@ function meshChooser() {
 }
 function isCloudMesh(v) { return /rodin|hyper3d|클라우드/i.test(v || ""); }
 function rodinKeyOk() {
+  if (KEY_SAVED.has("RODIN_API_KEY")) return true;
   const item = DIAG && (DIAG.items || []).find((i) => i.name === "RODIN_API_KEY (Hyper3D)");
   return !!(item && item.ok);
 }
@@ -592,7 +620,7 @@ function meshEngineReady() {
 function enginesReady() { return imageEngineReady() && meshEngineReady(); }
 window.chooseMeshEngine = async (v) => {
   STATE = await postJSON(`/api/projects/${PID}/engine`, { key: "mesh_3d", value: v });
-  keepScroll(() => renderCenter());
+  updateReadyUI();   // 부분 갱신
 };
 window.saveRodinKey = async () => {
   const el = $("rodinKeyInput");
@@ -600,8 +628,8 @@ window.saveRodinKey = async () => {
   if (!v) return;
   await postJSON("/api/env", { key: "RODIN_API_KEY", value: v });
   if (el) el.value = "";
-  await runDiagnose();
-  keepScroll(() => renderCenter());
+  KEY_SAVED.add("RODIN_API_KEY");
+  updateReadyUI();
 };
 
 // 항목이 현재 엔진 선택에 필요한지 (선택에 따라 불필요한 건 회색+필수제외)
@@ -735,13 +763,23 @@ window.runInstall = async (name, repoArg) => {
     if (log) { log.textContent = (s.lines || []).join("\n"); log.scrollTop = log.scrollHeight; }
     if (!s.running && s.code !== null && s.code !== undefined) {
       if (s.code === 0) {
-        if (hint) hint.innerHTML = '<span style="color:var(--accent)">명령 완료 · 재진단 중…</span>';
-        await runDiagnose();
-        keepScroll(() => renderCenter());
-        const nowItem = ((window._diagData || {}).items || []).find((i) => i.name === name);
-        if (hint) hint.innerHTML = (nowItem && nowItem.ok)
-          ? '<span style="color:var(--good)">설치 완료 ✅ — 이 항목 OK (모달 닫아도 됩니다)</span>'
-          : '<span style="color:var(--warn)">명령 완료 ✅ 하지만 이 항목은 추가 단계가 남음 — 아래 가이드/로그 확인 (예: FLUX는 모델 가중치 다운로드가 별도)</span>';
+        if (repoArg) {
+          // 이미지 모델: 경량 존재 확인 + 부분 갱신 (전체 재진단/리렌더 X)
+          if (hint) hint.innerHTML = '<span style="color:var(--accent)">다운로드 완료 · 확인 중…</span>';
+          await checkPresence(repoArg);
+          updateReadyUI();
+          if (hint) hint.innerHTML = MODEL_PRESENT[repoArg]
+            ? '<span style="color:var(--good)">설치 완료 ✅ — 모델 준비됨</span>'
+            : '<span style="color:var(--warn)">받아졌지만 감지 실패 — 로그 확인(라이선스/토큰?)</span>';
+        } else {
+          if (hint) hint.innerHTML = '<span style="color:var(--accent)">명령 완료 · 재진단 중…</span>';
+          await runDiagnose();
+          keepScroll(() => renderCenter());
+          const nowItem = ((window._diagData || {}).items || []).find((i) => i.name === name);
+          if (hint) hint.innerHTML = (nowItem && nowItem.ok)
+            ? '<span style="color:var(--good)">설치 완료 ✅ — 이 항목 OK</span>'
+            : '<span style="color:var(--warn)">명령 완료 ✅ 하지만 추가 단계 남음 — 로그 확인</span>';
+        }
         if (btn) btn.disabled = false;
       } else {
         const txt = (s.lines || []).join("\n");

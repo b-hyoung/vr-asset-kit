@@ -30,7 +30,7 @@ NAME_STAGE = {
     "python (py 포함)": "base", "node": "base", "git": "base", "uv": "base",
     "CUDA / GPU (nvidia-smi)": "base", "PyTorch (GPU)": "base",
     "Blender (선택·분석)": "base",
-    "이미지 모델 (로컬)": "image", "OPENAI_API_KEY": "image",
+    "OPENAI_API_KEY": "image",
     "Hunyuan3D-2 준비 (레포+모델)": "mesh", "RODIN_API_KEY (Hyper3D)": "mesh",
     "Unreal Engine": "unreal", "unrealclaude MCP 등록": "unreal",
     "Blender MCP 등록": "unreal",
@@ -151,7 +151,7 @@ DEP = {
     "python (py 포함)": "always", "node": "always", "git": "always", "uv": "always",
     "Blender (선택·분석)": "always",
     "CUDA / GPU (nvidia-smi)": "local", "PyTorch (GPU)": "local",
-    "이미지 모델 (로컬)": "image:local", "OPENAI_API_KEY": "image:cloud",
+    "OPENAI_API_KEY": "image:cloud",
     "Hunyuan3D-2 준비 (레포+모델)": "mesh:local", "RODIN_API_KEY (Hyper3D)": "mesh:cloud",
     "Unreal Engine": "always", "unrealclaude MCP 등록": "always",
     "Blender MCP 등록": "always",
@@ -221,7 +221,6 @@ def spec():
         {"name": "git", "required": False, "need": "버전관리 (선택)"},
         {"name": "uv", "required": False, "need": "파이썬 패키지 관리 (선택)"},
         {"name": "Blender (선택·분석)", "required": False, "need": "분석·블록아웃·검수용 (생성 아님)"},
-        {"name": "이미지 모델 (로컬)", "required": False, "need": "로컬 이미지 엔진 모델 — 엔진에서 FLUX/커스텀 선택 후 설치"},
         {"name": "OPENAI_API_KEY", "required": False, "need": "대안 — gpt-image-1 엔진 고를 때만"},
         {"name": "Hunyuan3D-2 준비 (레포+모델)", "required": True, "need": "로컬 3D 생성 — 레포+가중치"},
         {"name": "RODIN_API_KEY (Hyper3D)", "required": False, "need": "클라우드 3D(Rodin/Hyper3D) 쓸 때만"},
@@ -280,16 +279,7 @@ def run(hunyuan_dir=None, env_file=None, image_repo=None):
     # === B. 이미지 생성 (기본 로컬, gpt-image 선택 시 OpenAI 키) ===
     B = "B. 이미지 생성"
     # 로컬 이미지: FLUX.2 [dev] diffusers 모델 (HF 캐시). 서버 없이 스크립트 실행.
-    # 선택한 로컬 이미지 모델(repo)이 실제로 받아졌는지
-    if image_repo:
-        pr = _hf_repo_exact(image_repo)
-        add(B, "이미지 모델 (로컬)", bool(pr),
-            ("모델 있음: %s%s" % (image_repo, (" · %sGB" % pr[1]) if pr and pr[1] else "")) if pr
-            else "미다운로드: %s — 이미지 엔진 카드의 '이 모델 설치'" % image_repo,
-            required=False)
-    else:
-        add(B, "이미지 모델 (로컬)", False,
-            "이미지 엔진에서 로컬 모델(FLUX 또는 커스텀)을 선택하세요", required=False)
+    # (로컬 이미지 모델 상태는 이미지 엔진 카드의 모델 선택 UI에서 경량 확인 — 진단에서 분리)
     key_found, key_where = False, ""
     candidates = []
     if env_file:
