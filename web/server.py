@@ -63,14 +63,35 @@ INSTALL_STATE = {}          # item -> {"running":bool, "code":int|None, "lines":
 _install_lock = threading.Lock()
 
 
+def _load_env_vars():
+    """web/.env 를 dict 로 파싱 (설치 subprocess 에 주입 — HF_TOKEN 등)."""
+    d = {}
+    envp = os.path.join(BASE, ".env")
+    try:
+        if os.path.exists(envp):
+            for line in open(envp, encoding="utf-8", errors="ignore"):
+                s = line.strip()
+                if "=" in s and not s.startswith("#"):
+                    k, v = s.split("=", 1)
+                    d[k.strip()] = v.strip()
+    except Exception:
+        pass
+    # huggingface_hub 은 HF_TOKEN 을 읽음 — HUGGING_FACE_HUB_TOKEN 로도 미러
+    if d.get("HF_TOKEN") and not d.get("HUGGING_FACE_HUB_TOKEN"):
+        d["HUGGING_FACE_HUB_TOKEN"] = d["HF_TOKEN"]
+    return d
+
+
 def _run_install(item, cmds):
     st = INSTALL_STATE[item]
+    env = os.environ.copy()
+    env.update(_load_env_vars())
     try:
         for cmd in cmds:
             st["lines"].append("$ " + " ".join(cmd))
             try:
                 p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                     text=True, encoding="utf-8", errors="replace")
+                                     text=True, encoding="utf-8", errors="replace", env=env)
             except FileNotFoundError:
                 st["lines"].append("실행기 없음: %s (수동 설치 필요)" % cmd[0])
                 st["code"] = -1
@@ -365,7 +386,7 @@ class Handler(BaseHTTPRequestHandler):
             # 허용 키만 web/.env 에 저장 (값은 반환/로그 안 함)
             key = (body.get("key") or "").strip()
             val = body.get("value") or ""
-            if key not in ("OPENAI_API_KEY", "RODIN_API_KEY") or not val:
+            if key not in ("OPENAI_API_KEY", "RODIN_API_KEY", "HF_TOKEN") or not val:
                 return self._json({"error": "허용 키/값 필요"}, 400)
             envp = os.path.join(BASE, ".env")
             lines = []

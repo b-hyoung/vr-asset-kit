@@ -630,8 +630,21 @@ window.openGuide = (name) => {
       </select></div>` : "";
     const label = isFlux ? "⚡ 선택 모델 설치(가중치 다운로드)" : "⚡ 지금 설치";
     const note = isFlux ? "선택한 모델 가중치를 받습니다(대용량·시간 걸림)." : `이 자리에서 바로 설치합니다${warn}`;
+    const authBox = isFlux ? `<div class="auth-box">
+      <div class="hint" style="margin-bottom:6px">🔒 <b>게이트 모델</b>입니다 — 토큰 + 라이선스 동의가 필요해요.</div>
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <input id="hfToken" type="password" placeholder="HF 토큰 (hf_...)" autocomplete="off" spellcheck="false"
+          style="flex:1;background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:12px">
+        <button class="btn small" onclick="saveHfToken()">토큰 저장</button>
+      </div>
+      <div style="display:flex;gap:12px;font-size:12px">
+        <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noreferrer" style="color:var(--accent)">① 토큰 발급 ↗</a>
+        <a href="#" onclick="openLicense();return false" style="color:var(--accent)">② 이 모델 라이선스 동의 ↗</a>
+      </div>
+    </div>` : "";
     extra = `<div class="inst-box">
       ${modelSel}
+      ${authBox}
       <button class="btn gate" id="instBtn" onclick="runInstall('${escapeAttr(name)}')" ${(wingetItem && !WINGET) ? "disabled" : ""}>${label}</button>
       <span class="hint" id="instHint" style="margin-left:8px">${note}</span>
       <pre id="instLog" class="inst-log" style="display:none"></pre>
@@ -639,6 +652,25 @@ window.openGuide = (name) => {
   }
   $("docModalBody").innerHTML = extra + mdToHtml(g);
   $("docOverlay").classList.add("open");
+};
+
+window.saveHfToken = async () => {
+  const el = $("hfToken");
+  const v = el ? el.value.trim() : "";
+  const hint = $("instHint");
+  if (!v) return;
+  try {
+    await postJSON("/api/env", { key: "HF_TOKEN", value: v });
+    if (el) el.value = "";
+    if (hint) hint.innerHTML = '<span style="color:var(--good)">토큰 저장됨 ✅ — 라이선스 동의(②) 후 설치를 누르세요</span>';
+  } catch (e) {
+    if (hint) hint.textContent = "토큰 저장 실패: " + e.message;
+  }
+};
+window.openLicense = () => {
+  const r = $("fluxRepo");
+  const repo = r ? r.value : "black-forest-labs/FLUX.1-dev";
+  window.open("https://huggingface.co/" + repo, "_blank");
 };
 
 window.runInstall = async (name) => {
@@ -666,7 +698,11 @@ window.runInstall = async (name) => {
           : '<span style="color:var(--warn)">명령 완료 ✅ 하지만 이 항목은 추가 단계가 남음 — 아래 가이드/로그 확인 (예: FLUX는 모델 가중치 다운로드가 별도)</span>';
         if (btn) btn.disabled = false;
       } else {
-        if (hint) hint.innerHTML = '<span style="color:var(--bad)">실패(코드 ' + s.code + ') — 로그 확인 후 수동 가이드</span>';
+        const txt = (s.lines || []).join("\n");
+        const gated = /gated|restricted|401|log ?in|authenticate|access to model/i.test(txt);
+        if (hint) hint.innerHTML = gated
+          ? '<span style="color:var(--warn)">🔒 게이트 접근 거부 — ① HF 토큰 저장 ② 라이선스 동의(위 링크) 후 다시 설치하세요</span>'
+          : '<span style="color:var(--bad)">실패(코드 ' + s.code + ') — 로그 확인 후 수동 가이드</span>';
         if (btn) btn.disabled = false;
       }
       break;
