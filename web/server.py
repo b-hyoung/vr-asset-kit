@@ -66,15 +66,70 @@ _install_lock = threading.Lock()
 # 강도 스펙트럼 4장 생성 (선택 엔진: gpt-image=클라우드 / 그 외=로컬 diffusers)
 SPECTRUM_STATE = {"running": False, "images": None, "error": None, "log": []}
 _INTENS = [
-    ("은은", "은은하고 낮은 대비, 뮤트 파스텔, 부드러운 빛, subtle muted low-contrast"),
-    ("중간", "자연스러운 사실적 톤, 보통 대비와 채도, natural realistic"),
-    ("뚜렷", "선명하고 높은 대비, 진한 색, 뚜렷한 그림자, vivid high-contrast bold"),
-    ("하이", "강렬한 하이톤, 과장된 대비·채도, 극적 조명·발광, hyper vivid dramatic glowing"),
+    ("은은", "은은한 낮은대비 파스텔, soft muted"),
+    ("중간", "자연스러운 사실적, natural"),
+    ("뚜렷", "선명한 높은대비, vivid bold"),
+    ("하이", "강렬한 하이대비 발광, hyper dramatic"),
 ]
 
 
 def _spectrum_prompt(topic, bg, style):
-    return "%s, %s, %s. 하나의 일관된 장면, 디지털 콘셉트 아트." % (topic, bg, style)
+    # CLIP 77토큰 제한 → 짧게
+    return ("%s, %s, %s, concept art" % (topic, bg, style))[:220]
+
+
+# 모델을 켜둔 채 재사용 (매번 재로딩 방지 → 빠름·GPU 활용)
+_PIPE_CACHE = {"repo": None, "pipe": None}
+
+
+def _get_pipe(repo, st):
+    if _PIPE_CACHE["repo"] == repo and _PIPE_CACHE["pipe"] is not None:
+        st["log"].append("모델 캐시 사용(로딩 생략): " + repo)
+        return _PIPE_CACHE["pipe"]
+    import torch
+    from diffusers import AutoPipelineForText2Image
+    # 이전 모델 해제
+    if _PIPE_CACHE["pipe"] is not None:
+        try:
+            _PIPE_CACHE["pipe"] = None
+            torch.cuda.empty_cache()
+        except Exception:
+            pass
+    # 크기 vs 여유 VRAM → 오프로드 결정
+    size_gb = None
+    try:
+        from huggingface_hub import scan_cache_dir
+        for r in scan_cache_dir().repos:
+            if r.repo_id.lower() == repo.lower():
+                size_gb = r.size_on_disk / 1e9
+                break
+    except Exception:
+        pass
+    free_gb = torch.cuda.mem_get_info()[0] / 1e9 if torch.cuda.is_available() else 0
+    use_offload = bool(size_gb and free_gb and size_gb * 1.15 > free_gb)
+    st["log"].append("모델 로딩: %s (~%.1fGB, 여유 %.1fGB → %s)" % (
+        repo, size_gb or -1, free_gb, "오프로드" if use_offload else "GPU 직접"))
+    pipe = AutoPipelineForText2Image.from_pretrained(
+        repo, torch_dtype=(torch.float16 if torch.cuda.is_available() else torch.float32))
+    if torch.cuda.is_available():
+        if use_offload:
+            pipe.enable_model_cpu_offload()
+        else:
+            try:
+                pipe.to("cuda")
+            except RuntimeError:
+                pipe.enable_model_cpu_offload()
+    for _m in ("enable_attention_slicing", "enable_vae_slicing", "enable_vae_tiling"):
+        try:
+            getattr(pipe, _m)()
+        except Exception:
+            pass
+    try:
+        pipe.set_progress_bar_config(disable=True)
+    except Exception:
+        pass
+    _PIPE_CACHE.update({"repo": repo, "pipe": pipe})
+    return pipe
 
 
 def _run_spectrum(engine, repo, topic, bg):
@@ -96,35 +151,34 @@ def _run_spectrum(engine, repo, topic, bg):
                 imgs.append({"name": name, "b64": out["data"][0]["b64_json"]})
             st["images"] = imgs
         else:
-            # 로컬 diffusers 생성
+            # 로컬 diffusers 생성 (모델 캐시로 warm 유지 → 빠름)
             if not repo:
                 st["error"] = "로컬 모델(repo) 미선택"; return
-            rl = repo.lower()
-            steps = 4 if ("schnell" in rl or "turbo" in rl or "lightning" in rl) else 20
-            outp = os.path.join(BASE, "projects", "_spectrum_out.json")
-            jobp = os.path.join(BASE, "projects", "_spectrum_job.json")
-            job = {"repo": repo, "steps": steps, "size": 512, "out": outp,
-                   "prompts": [{"name": n, "prompt": _spectrum_prompt(topic, bg, s)} for n, s in _INTENS]}
-            os.makedirs(os.path.dirname(jobp), exist_ok=True)
-            with open(jobp, "w", encoding="utf-8") as f:
-                json.dump(job, f, ensure_ascii=False)
+            import io as _io, base64 as _b64, torch
+            os.environ.update(_load_env_vars())   # HF 로그인 등
             try:
-                os.remove(outp)
-            except OSError:
-                pass
-            env = os.environ.copy(); env.update(_load_env_vars())
-            cmd = _PYEXE + [os.path.join(BASE, "gen_spectrum.py"), jobp]
-            st["log"].append("$ " + " ".join(cmd))
-            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                 text=True, encoding="utf-8", errors="replace", env=env)
-            for line in p.stdout:
-                st["log"].append(line.rstrip())
-                del st["log"][:-400]
-            p.wait()
-            if p.returncode == 0 and os.path.exists(outp):
-                st["images"] = json.load(open(outp, encoding="utf-8"))["images"]
-            else:
-                st["error"] = "로컬 생성 실패(코드 %s) — 로그 확인" % p.returncode
+                pipe = _get_pipe(repo, st)
+            except Exception as e:
+                st["error"] = "모델 로드 실패: " + str(e)[:150]; return
+            rl = repo.lower()
+            fast = ("schnell" in rl or "turbo" in rl or "lightning" in rl)
+            steps = 4 if fast else 20
+            imgs = []
+            for name, style in _INTENS:
+                st["log"].append("생성: " + name)
+                kw = {"num_inference_steps": steps, "height": 512, "width": 512}
+                if fast:
+                    kw["guidance_scale"] = 0.0
+                try:
+                    with torch.inference_mode():
+                        out = pipe(_spectrum_prompt(topic, bg, style), **kw)
+                except Exception as e:
+                    torch.cuda.empty_cache()
+                    st["error"] = "'%s' 생성 실패: %s" % (name, str(e)[:120]); return
+                im = out.images[0]
+                buf = _io.BytesIO(); im.save(buf, format="PNG")
+                imgs.append({"name": name, "b64": _b64.b64encode(buf.getvalue()).decode()})
+            st["images"] = imgs
     except Exception as e:
         st["error"] = str(e)[:200]
     finally:
