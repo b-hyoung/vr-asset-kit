@@ -230,8 +230,14 @@ function renderCenter() {
     html += renderDiagnosticBlock();
   }
 
+  // 단계 도움말 (빈 종이 막막함 완화)
+  if (s.help && !locked) {
+    html += `<div class="step-help">💡 ${escapeHtml(s.help)}</div>`;
+  }
+
   // 입력 필드
   const inputs = s.inputs || [];
+  const PH = { topic: "예: 조선 저잣거리 / 눈 내리는 산사", background: "예: 노을 질 무렵, 따뜻한 톤 / 비 내리는 밤" };
   if (inputs.length) {
     html += `<div style="margin-top:8px">`;
     for (const f of inputs) {
@@ -240,11 +246,16 @@ function renderCenter() {
         html += renderAssetList(val, locked);
       } else {
         const isLong = f === "background";
+        const ph = PH[f] || "여기에 직접 입력…";
+        const ideas = (s.ideas && s.ideas[f]) || [];
+        const chips = (ideas.length && !locked)
+          ? `<div class="idea-chips">${ideas.map((t) => `<button class="idea-chip" onclick="appendIdea('${f}','${escapeAttr(t)}')">+ ${escapeHtml(t)}</button>`).join("")}</div>`
+          : "";
         html += `<div class="field"><label>${labelFor(f)}</label>` +
           (isLong
-            ? `<textarea data-field="${f}" ${locked ? "disabled" : ""} placeholder="여기에 직접 입력…">${escapeHtml(String(val))}</textarea>`
-            : `<input data-field="${f}" ${locked ? "disabled" : ""} placeholder="여기에 직접 입력…" value="${escapeAttr(String(val))}">`) +
-          `</div>`;
+            ? `<textarea data-field="${f}" ${locked ? "disabled" : ""} placeholder="${escapeAttr(ph)}">${escapeHtml(String(val))}</textarea>`
+            : `<input data-field="${f}" ${locked ? "disabled" : ""} placeholder="${escapeAttr(ph)}" value="${escapeAttr(String(val))}">`) +
+          chips + `</div>`;
       }
     }
     html += `</div>`;
@@ -937,6 +948,15 @@ async function saveInput(field, value) {
   renderFlowList(); // 게이트 버튼 활성화 등 갱신
   updateGateButtons();
 }
+// 아이디어 조각 클릭 → 해당 입력칸에 이어붙임 (전체 리렌더 없이)
+window.appendIdea = async (field, text) => {
+  const el = document.querySelector(`[data-field="${field}"]`);
+  if (!el) return;
+  const curv = el.value.replace(/\s+$/, "");
+  el.value = curv ? (curv + " " + text) : text;
+  el.focus();
+  await saveInput(field, el.value);
+};
 async function setEngine(key, value) {
   STATE = await postJSON(`/api/projects/${PID}/engine`, { key, value });
 }

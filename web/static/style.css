@@ -60,6 +60,10 @@ code{font-family:var(--mono);font-size:12px;background:#0c0f13;border:1px solid 
 .field{margin-bottom:10px}
 .field label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
 .field input,.field textarea,.field select{width:100%;background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-family:inherit;font-size:13px}
+.step-help{background:#122029;border:1px solid #2b4a5a;border-radius:8px;padding:8px 12px;font-size:12.5px;color:var(--dim);margin:4px 0 10px}
+.idea-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.idea-chip{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:3px 10px;font-size:12px;color:var(--dim)}
+.idea-chip:hover{border-color:var(--accent);color:var(--ink)}
 .field textarea{min-height:56px;resize:vertical}
 .tag-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .tag-list .chip{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:3px 10px;font-size:12px;display:flex;gap:6px;align-items:center}
