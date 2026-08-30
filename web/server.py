@@ -399,6 +399,33 @@ class Handler(BaseHTTPRequestHandler):
         p = u.path
         body = self._body_json()
 
+        if p == "/api/spectrum":
+            key = _openai_key()
+            if not key:
+                return self._json({"error": "OpenAI 키 필요 — 1단계에서 저장"}, 400)
+            topic = body.get("topic", ""); bg = body.get("background", "")
+            if not topic:
+                return self._json({"error": "먼저 주제를 입력하세요"}, 400)
+            intens = [
+                ("은은", "은은하고 낮은 대비, 뮤트 파스텔, 부드러운 빛, subtle muted low-contrast"),
+                ("중간", "자연스러운 사실적 톤, 보통 대비와 채도, natural realistic"),
+                ("뚜렷", "선명하고 높은 대비, 진한 색, 뚜렷한 그림자, vivid high-contrast bold"),
+                ("하이", "강렬한 하이톤, 과장된 대비·채도, 극적 조명·발광, hyper vivid dramatic glowing"),
+            ]
+            images = []
+            for name, style in intens:
+                prompt = "%s, %s, %s. 하나의 일관된 장면, 디지털 콘셉트 아트." % (topic, bg, style)
+                rb = json.dumps({"model": "gpt-image-1", "prompt": prompt,
+                                 "size": "1024x1024", "quality": "low", "n": 1}).encode()
+                req = _urlreq.Request("https://api.openai.com/v1/images/generations", data=rb,
+                                      headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
+                try:
+                    out = json.load(_urlreq.urlopen(req, timeout=120))
+                    images.append({"name": name, "b64": out["data"][0]["b64_json"]})
+                except Exception as e:
+                    return self._json({"error": "'%s' 생성 실패: %s" % (name, str(e)[:120])}, 500)
+            return self._json({"images": images})
+
         if p == "/api/suggest-anchor":
             key = _openai_key()
             if not key:

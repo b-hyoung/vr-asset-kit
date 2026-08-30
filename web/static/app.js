@@ -333,19 +333,49 @@ function anchorChooser(locked) {
   for (const lv of ANCHOR_LEVELS) {
     const on = cur === lv.name;
     const desc = ANCHOR_DESC[lv.name] || lv.desc;
-    h += `<button class="anchor-card ${on ? "on" : ""}" ${locked ? "disabled" : ""} onclick="setAnchor('${lv.name}')">
+    h += `<button class="anchor-card ${on ? "on" : ""}" data-name="${lv.name}" ${locked ? "disabled" : ""} onclick="setAnchor('${lv.name}')">
       <div class="ac-name">${on ? "● " : ""}${lv.name}</div>
       <div class="ac-desc">${escapeHtml(desc)}</div>
     </button>`;
   }
   h += `</div>`;
-  if (!locked) h += `<button type="button" class="btn small" style="margin-top:8px" onclick="suggestAnchor(this)">🤖 이 주제에 맞춰 설명 생성</button>`;
+  if (!locked) {
+    h += `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button type="button" class="btn small" onclick="genSpectrum(this)">🖼 강도별 4장 이미지 생성</button>
+      <button type="button" class="btn small ghost" onclick="suggestAnchor(this)">🤖 설명만 생성</button>
+    </div>
+    <div id="spectrumImgs" class="spectrum-grid"></div>`;
+  }
   return h + `</div>`;
 }
 window.setAnchor = async (name) => {
   STATE = await postJSON(`/api/projects/${PID}/input`, { field: "anchor", value: name });
-  const el = $("anchorWrap"); if (el) el.innerHTML = anchorChooser(false);  // 부분 갱신
+  // 제자리 선택 갱신 (생성된 이미지 유지)
+  document.querySelectorAll(".anchor-card").forEach((el) => el.classList.toggle("on", el.dataset.name === name));
+  document.querySelectorAll(".spec-card").forEach((el) => el.classList.toggle("on", el.dataset.name === name));
   renderFlowList(); updateGateButtons();
+};
+window.genSpectrum = async (btn) => {
+  const inp = STATE.inputs || {};
+  const box = $("spectrumImgs");
+  if (btn) { btn.disabled = true; btn.textContent = "🖼 생성 중… (수십 초)"; }
+  if (box) box.innerHTML = `<span class="hint">gpt-image로 4장 생성 중… 잠시만요</span>`;
+  try {
+    const d = await postJSON("/api/spectrum", { topic: inp.topic || "", background: inp.background || "" });
+    if (d.error) {
+      if (box) box.innerHTML = `<span class="hint" style="color:var(--warn)">${escapeHtml(d.error)}</span>`;
+    } else {
+      const cur = (STATE.inputs || {}).anchor || "";
+      box.innerHTML = (d.images || []).map((im) =>
+        `<button class="spec-card ${cur === im.name ? "on" : ""}" data-name="${im.name}" onclick="setAnchor('${im.name}')">
+          <img src="data:image/png;base64,${im.b64}" alt="${escapeAttr(im.name)}">
+          <span class="spec-name">${escapeHtml(im.name)}</span>
+        </button>`).join("");
+    }
+  } catch (e) {
+    if (box) box.innerHTML = `<span class="hint" style="color:var(--bad)">생성 실패: ${e.message}</span>`;
+  }
+  if (btn) { btn.disabled = false; btn.textContent = "🖼 다시 생성"; }
 };
 window.suggestAnchor = async (btn) => {
   const inp = STATE.inputs || {};
