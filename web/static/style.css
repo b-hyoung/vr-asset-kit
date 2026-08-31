@@ -217,6 +217,16 @@ code{font-family:var(--mono);font-size:12px;background:#0c0f13;border:1px solid 
 .mo-repo{font-size:10.5px;font-family:var(--mono);color:var(--faint)}
 .mo-tags{margin-top:3px;display:flex;flex-wrap:wrap;gap:4px}
 .mtag{font-size:9.5px;font-family:var(--mono);color:var(--dim);border:1px solid var(--line);border-radius:9px;padding:0 6px}
+/* 이 PC 기준 모델 판정 색상 */
+.mtag.v-rec{color:var(--good);border-color:#2c5a41;background:#12241a;font-weight:600}
+.mtag.v-ok{color:var(--warn);border-color:#5a4a2b;background:#241f14;font-weight:600}
+.mtag.v-risk,.mtag.v-no{color:var(--bad);border-color:#5a2b2b;background:#241416;font-weight:600}
+.gpu-banner{font-size:11px;color:var(--dim);background:#0c0f13;border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin:2px 0 8px;line-height:1.7}
+.gpu-banner b{color:var(--ink)}
+.gpu-banner.nogpu{border-color:#5a4a2b;color:var(--warn)}
+.gb-legend{display:block;margin-top:3px;font-size:10px;color:var(--faint)}
+.gb-legend .v-rec{color:var(--good)}.gb-legend .v-ok{color:var(--warn)}
+.gb-legend .v-risk,.gb-legend .v-no{color:var(--bad)}
 .key-row{display:flex;gap:6px;margin-top:6px}
 .key-row input{flex:1;background:#0c0f13;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:7px 9px;font-family:var(--mono);font-size:12px}
 .ic-status{margin-top:7px;font-size:12px;font-family:var(--mono)}

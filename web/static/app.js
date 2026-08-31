@@ -661,6 +661,22 @@ const FLUX_PRESETS = [
   "black-forest-labs/FLUX.1-dev",
   "black-forest-labs/FLUX.2-dev",
 ];
+// 이 PC(GPU) 기준 배너 — 모델 판정의 근거를 보여줌
+function gpuBanner() {
+  const g = MODELS._gpu;
+  if (!g) return "";
+  if (!g.has_gpu)
+    return `<div class="gpu-banner nogpu">⚠ GPU 미감지 — CPU만으로는 로컬 생성이 매우 느립니다. 아래 판정은 참고치입니다.</div>`;
+  return `<div class="gpu-banner">🖥 이 PC: <b>${escapeHtml(g.gpu || "GPU")}</b> · VRAM <b>${g.vram_total_gb}GB</b> (가용 ${g.vram_free_gb}GB)
+    <span class="gb-legend"><span class="v-rec">추천</span> 직접·빠름 · <span class="v-ok">가능</span> 오프로드·느림 · <span class="v-risk">위험</span> OOM 튕김 가능 · <span class="v-no">불가</span></span></div>`;
+}
+// 태그 렌더 — verdict가 있으면 첫 태그(판정)를 색상 강조
+function mtagsHtml(m) {
+  const vc = { rec: "v-rec", ok: "v-ok", risk: "v-risk", no: "v-no" }[m.verdict];
+  return (m.tags || []).map((t, i) =>
+    `<span class="mtag${i === 0 && vc ? " " + vc : ""}">${escapeHtml(t)}</span>`).join("");
+}
+
 function imageChooser() {
   const choices = (ENGINES.roles && ENGINES.roles.image && ENGINES.roles.image.choices) || [];
   const cur = (STATE.engine_choices || {}).image || "";
@@ -676,12 +692,13 @@ function imageChooser() {
   // 로컬 엔진: 카탈로그에서 모델 선택(hover 설명) + 직접입력
   if (cur && !/gpt-image/i.test(cur)) {
     h += `<div class="model-pick">`;
+    h += gpuBanner();
     if (MODELS.image_guide) h += `<div class="step-help" style="margin:2px 0 8px">${escapeHtml(MODELS.image_guide)}</div>`;
     h += `<div class="hint" style="margin-bottom:6px">모델 선택 (마우스를 올리면 설명):</div>`;
     h += `<div class="model-list">`;
     for (const m of (MODELS.image || [])) {
       const on = m.repo === repo;
-      const tags = (m.tags || []).map((t) => `<span class="mtag">${escapeHtml(t)}</span>`).join("");
+      const tags = mtagsHtml(m);
       h += `<button class="model-opt ${on ? "on" : ""}" title="${escapeAttr(m.desc || "")}" onclick="setImageRepo('${escapeAttr(m.repo)}')">
         <span class="io-dot">${on ? "●" : "○"}</span>
         <span class="mo-main"><span class="mo-name">${escapeHtml(m.name)}</span> <span class="mo-repo">${escapeHtml(m.repo)}</span><div class="mo-tags">${tags}</div></span>
@@ -785,10 +802,10 @@ function meshChooser() {
 
   // 로컬(Hunyuan): 모델 카탈로그 선택 + 설치
   if (cur && !isCloudMesh(cur)) {
-    h += `<div class="model-pick"><div class="hint" style="margin-bottom:6px">3D 모델 선택 (마우스 올리면 설명):</div><div class="model-list">`;
+    h += `<div class="model-pick">${gpuBanner()}<div class="hint" style="margin-bottom:6px">3D 모델 선택 (마우스 올리면 설명 · shape=메시 / texgen=텍스처 따로 판정):</div><div class="model-list">`;
     for (const m of (MODELS.mesh || [])) {
       const on = m.repo === repo;
-      const tags = (m.tags || []).map((t) => `<span class="mtag">${escapeHtml(t)}</span>`).join("");
+      const tags = mtagsHtml(m);
       h += `<button class="model-opt ${on ? "on" : ""}" title="${escapeAttr(m.desc || "")}" onclick="setMeshRepo('${escapeAttr(m.repo)}')">
         <span class="io-dot">${on ? "●" : "○"}</span>
         <span class="mo-main"><span class="mo-name">${escapeHtml(m.name)}</span> <span class="mo-repo">${escapeHtml(m.repo)}</span><div class="mo-tags">${tags}</div></span>

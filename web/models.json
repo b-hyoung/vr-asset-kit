@@ -1,28 +1,28 @@
 {
   "note": "이미지 로컬 모델 카탈로그. UI에서 리스트로 선택(hover 시 desc 툴팁). 편집 가능.",
   "image": [
-    { "repo": "stabilityai/sdxl-turbo", "name": "SDXL Turbo", "tags": ["16GB 쾌적✅", "⚡매우빠름", "무동의✅"],
-      "desc": "★16GB 강추. ~7GB라 GPU 직접(빠름). 4스텝·512 초고속, 동의/로그인 불필요. 빠른 반복·강도확인용." },
-    { "repo": "stabilityai/stable-diffusion-xl-base-1.0", "name": "SDXL 1.0", "tags": ["16GB 쾌적✅", "무동의✅", "품질 좋음"],
-      "desc": "★16GB 강추. ~7GB GPU 직접. 20스텝, 품질/속도 균형, LoRA 방대. 동의 불필요." },
-    { "repo": "stabilityai/stable-diffusion-3.5-medium", "name": "SD 3.5 Medium", "tags": ["16GB 쾌적✅", "게이트🔒", "품질 좋음"],
-      "desc": "~5GB로 16GB 쾌적. 품질 좋음. 단 게이트(로그인+동의)." },
-    { "repo": "Qwen/Qwen-Image", "name": "Qwen-Image", "tags": ["16GB 오프로드⚠️", "무동의✅", "글자 강함"],
-      "desc": "20B 대형 → 16GB선 CPU 오프로드로 느림. 동의 불필요. 이미지 속 글자 최강." },
-    { "repo": "black-forest-labs/FLUX.1-schnell", "name": "FLUX.1 schnell", "tags": ["16GB 오프로드⚠️", "게이트🔒", "고품질·4스텝"],
-      "desc": "~23GB → 16GB선 오프로드(느림). 게이트. FLUX 화질을 4스텝으로." },
-    { "repo": "black-forest-labs/FLUX.1-dev", "name": "FLUX.1 dev", "tags": ["16GB 오프로드⚠️", "게이트🔒", "최고급"],
-      "desc": "~24GB → 16GB선 오프로드(꽤 느림). 게이트. 최상급 품질. 최종용." },
-    { "repo": "black-forest-labs/FLUX.2-dev", "name": "FLUX.2 dev", "tags": ["16GB 버거움❌", "게이트🔒", "최신 최고화질"],
-      "desc": "매우 큼 → 16GB엔 무리(fp8 양자화 필요). 게이트. 고사양·최종 결과물용." },
-    { "repo": "stabilityai/stable-diffusion-3.5-large", "name": "SD 3.5 Large", "tags": ["16GB 오프로드⚠️", "게이트🔒", "생태계"],
-      "desc": "~16GB라 빠듯 → 오프로드 권장. 게이트. LoRA/ControlNet 생태계 최강." }
+    { "repo": "stabilityai/sdxl-turbo", "name": "SDXL Turbo", "tags": ["⚡매우빠름", "무동의✅"], "req_direct_gb": 7, "req_offload_gb": 4,
+      "desc": "~7GB라 GPU 직접(빠름). 4스텝·512 초고속, 동의/로그인 불필요. 빠른 반복·강도확인용." },
+    { "repo": "stabilityai/stable-diffusion-xl-base-1.0", "name": "SDXL 1.0", "tags": ["무동의✅", "품질 좋음"], "req_direct_gb": 7, "req_offload_gb": 5,
+      "desc": "~7GB GPU 직접. 20스텝, 품질/속도 균형, LoRA 방대. 동의 불필요." },
+    { "repo": "stabilityai/stable-diffusion-3.5-medium", "name": "SD 3.5 Medium", "tags": ["게이트🔒", "품질 좋음"], "req_direct_gb": 5, "req_offload_gb": 4,
+      "desc": "~5GB. 품질 좋음. 단 게이트(로그인+동의)." },
+    { "repo": "Qwen/Qwen-Image", "name": "Qwen-Image", "tags": ["무동의✅", "글자 강함"], "req_direct_gb": 20, "req_offload_gb": 9,
+      "desc": "20B 대형 → 직접 로드는 16GB 초과. CPU 오프로드로 실행(느림). 이미지 속 글자 최강." },
+    { "repo": "black-forest-labs/FLUX.1-schnell", "name": "FLUX.1 schnell", "tags": ["게이트🔒", "고품질·4스텝"], "req_direct_gb": 23, "req_offload_gb": 9,
+      "desc": "~23GB → 직접 불가, 오프로드로 실행(느림). 게이트. FLUX 화질을 4스텝으로." },
+    { "repo": "black-forest-labs/FLUX.1-dev", "name": "FLUX.1 dev", "tags": ["게이트🔒", "최고급"], "req_direct_gb": 24, "req_offload_gb": 10,
+      "desc": "~24GB → 직접 불가, 오프로드로 실행(꽤 느림). 게이트. 최상급 품질. 최종용." },
+    { "repo": "black-forest-labs/FLUX.2-dev", "name": "FLUX.2 dev", "tags": ["게이트🔒", "최신 최고화질"], "req_direct_gb": 40, "req_offload_gb": 16,
+      "desc": "매우 큼 → fp8 양자화 없이는 16GB 무리(오프로드해도 peak가 VRAM에 닿음). 고사양·최종용." },
+    { "repo": "stabilityai/stable-diffusion-3.5-large", "name": "SD 3.5 Large", "tags": ["게이트🔒", "생태계"], "req_direct_gb": 16, "req_offload_gb": 8,
+      "desc": "~16GB라 직접은 빠듯 → 오프로드 권장. 게이트. LoRA/ControlNet 생태계 최강." }
   ],
   "image_guide": "16GB VRAM 기준 — ✅쾌적(GPU직접,빠름): SDXL Turbo·SDXL 1.0·SD3.5 Medium / ⚠️오프로드(느림): Qwen·FLUX.1·SD3.5 Large / ❌버거움: FLUX.2. 빠른 반복은 gpt-image(클라우드)도 좋음.",
   "mesh": [
-    { "repo": "tencent/Hunyuan3D-2", "name": "Hunyuan3D-2", "tags": ["고품질", "디스크 28GB", "shape 16GB✅", "texgen 16GB 빠듯⚠️"],
-      "desc": "이미지→3D 최고 품질. 디스크 약 28GB(≠VRAM). shape(메시): VRAM ~6GB→16GB 쾌적✅. texgen(텍스처): peak가 16GB 근처라 빠듯 → cpu_offload 필수·해상도 낮추기⚠️. 게이트 아님." },
-    { "repo": "tencent/Hunyuan3D-2mini", "name": "Hunyuan3D-2 mini", "tags": ["빠름", "디스크 8GB", "shape 8GB✅"],
-      "desc": "경량판(디스크 약 8GB, ≠VRAM). shape VRAM ~5GB→16GB 여유✅·저사양도 가능. turbo subfolder(hunyuan3d-dit-v2-mini-turbo) 필요. 프로토타이핑·빠른 반복용." }
+    { "repo": "tencent/Hunyuan3D-2", "name": "Hunyuan3D-2", "tags": ["고품질", "디스크 28GB"], "shape_gb": 6, "texgen_gb": 15,
+      "desc": "이미지→3D 최고 품질. 디스크 약 28GB(≠VRAM). shape(메시) VRAM ~6GB. texgen(텍스처)는 peak ~15GB로 VRAM에 닿음 → cpu_offload 필수·해상도 낮추기. 게이트 아님." },
+    { "repo": "tencent/Hunyuan3D-2mini", "name": "Hunyuan3D-2 mini", "tags": ["빠름", "디스크 8GB"], "shape_gb": 5, "texgen_gb": 9,
+      "desc": "경량판(디스크 약 8GB, ≠VRAM). shape VRAM ~5GB·texgen ~9GB로 16GB에 여유. turbo subfolder(hunyuan3d-dit-v2-mini-turbo) 필요. 프로토타이핑·빠른 반복용." }
   ]
 }

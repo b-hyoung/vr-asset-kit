@@ -44,6 +44,85 @@ _lock = threading.Lock()
 # 프로젝트별 상태 버전 (SSE 가 이 값 변화를 감지해 푸시)
 _versions = {}
 
+# ---------- GPU 감지 + 모델별 "이 PC 기준" 판정 ----------
+# 어제 크래시(튕김)의 원인: 총 VRAM이 아니라 '가용(free) VRAM'이 실사용 한도.
+# texgen peak가 가용 VRAM에 닿으면 OOM → 크래시. 그래서 free 기준으로 판정한다.
+_GPU_CACHE = {"t": 0, "info": None}
+
+
+def _gpu_info():
+    """nvidia-smi로 실제 GPU/VRAM 감지 (5초 캐시). 없으면 None."""
+    now = time.time()
+    if _GPU_CACHE["info"] is not None and now - _GPU_CACHE["t"] < 5:
+        return _GPU_CACHE["info"]
+    info = None
+    exe = shutil.which("nvidia-smi")
+    if exe:
+        try:
+            out = subprocess.run(
+                [exe, "--query-gpu=name,memory.total,memory.free",
+                 "--format=csv,noheader,nounits"],
+                capture_output=True, text=True, timeout=6)
+            line = (out.stdout or "").strip().splitlines()
+            if line:
+                name, tot, free = [x.strip() for x in line[0].split(",")[:3]]
+                info = {"gpu": name,
+                        "vram_total_gb": round(float(tot) / 1024, 1),
+                        "vram_free_gb": round(float(free) / 1024, 1),
+                        "has_gpu": True}
+        except Exception:
+            info = None
+    if info is None:
+        info = {"gpu": None, "vram_total_gb": None, "vram_free_gb": None, "has_gpu": False}
+    _GPU_CACHE.update(t=now, info=info)
+    return info
+
+
+def _verdict(req_direct, req_offload_min, free, total):
+    """모델 VRAM 요구를 이 PC 가용/총 VRAM과 비교해 판정.
+    req_direct: VRAM 직접 로드에 필요한 대략치(GB) — 이하면 빠름.
+    req_offload_min: cpu offload로도 최소 필요한 VRAM(GB) — peak 개념. 이게 free를 넘으면 위험.
+    반환: (badge, level)  level: rec|ok|risk|no"""
+    if not free:
+        return ("GPU 미감지", "no")
+    # 여유를 두고 판정 (데스크톱/기타 점유 고려)
+    if req_direct <= free - 1.0:
+        return ("이PC 추천 ✅", "rec")           # 직접 로드, 빠름
+    if req_offload_min <= free - 1.5:
+        return ("이PC 가능(오프로드·느림) ⚠️", "ok")  # RAM 오프로드로 실행
+    if req_offload_min <= (total or 0):
+        return ("이PC 위험(OOM 가능) ⛔", "risk")     # peak가 가용 근처 → 어제 크래시 유형
+    return ("이PC 불가 ✖", "no")
+
+
+def _annotate_models(catalog, info):
+    """models.json에 이 PC 기준 판정 태그를 맨 앞에 주입 (원본 미변경, 사본 반환)."""
+    import copy
+    free = info.get("vram_free_gb")
+    total = info.get("vram_total_gb")
+    cat = copy.deepcopy(catalog)
+    for m in cat.get("image", []):
+        rd = m.get("req_direct_gb")
+        ro = m.get("req_offload_gb", rd)
+        if rd is None:
+            continue
+        badge, lvl = _verdict(rd, ro, free, total)
+        m["verdict"] = lvl
+        m.setdefault("tags", []).insert(0, badge)
+    for m in cat.get("mesh", []):
+        # 메시는 shape/texgen 따로 판정 (texgen이 병목)
+        sg = m.get("shape_gb"); tg = m.get("texgen_gb")
+        if sg is None:
+            continue
+        sb, sl = _verdict(sg, sg, free, total)
+        tb, tl = _verdict(tg or sg, tg or sg, free, total)
+        m["verdict"] = tl if tl in ("risk", "no") else sl
+        m.setdefault("tags", []).insert(0, "texgen %s" % tb.replace("이PC ", ""))
+        m["tags"].insert(0, "shape %s" % sb.replace("이PC ", ""))
+    cat["_gpu"] = info
+    return cat
+
+
 # ---------- 그 자리 설치 (화이트리스트만) ----------
 # 안전: 미리 정의된 명령만 실행. CUDA/UE 등 무거운 GUI 설치는 제외(가이드만).
 _PYEXE = [sys.executable] if sys.executable else ["py", "-3"]
@@ -467,7 +546,10 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/engines":
             return self._json(read_json(ENGINES_PATH, {}))
         if p == "/api/models":
-            return self._json(read_json(os.path.join(BASE, "models.json"), {"image": []}))
+            cat = read_json(os.path.join(BASE, "models.json"), {"image": []})
+            return self._json(_annotate_models(cat, _gpu_info()))
+        if p == "/api/gpu":
+            return self._json(_gpu_info())
         if p == "/api/examples":
             names = []
             if os.path.isdir(EXAMPLES_DIR):
