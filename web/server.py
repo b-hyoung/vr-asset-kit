@@ -142,6 +142,79 @@ INSTALL_CMDS = {
 INSTALL_STATE = {}          # item -> {"running":bool, "code":int|None, "lines":[...]}
 _install_lock = threading.Lock()
 
+# 설치/다운로드 작업 파일 (서버 재시작해도 상태가 남도록 **디스크**에 둔다)
+INSTALL_DIR = os.path.join(BASE, ".install")
+INSTALL_RUNNER = os.path.join(BASE, "install_runner.py")
+
+
+def _install_slug(item):
+    """item("model:org/name" 등)을 파일명으로 쓸 수 있게 만든다."""
+    return "".join(c if (c.isalnum() or c in "._-") else "_" for c in item)[:120]
+
+
+def _install_paths(item):
+    s = _install_slug(item)
+    return (os.path.join(INSTALL_DIR, s + ".job.json"),
+            os.path.join(INSTALL_DIR, s + ".log"),
+            os.path.join(INSTALL_DIR, s + ".status.json"))
+
+
+def _install_read(item):
+    """디스크에서 진행 상태를 읽는다. 없으면 None."""
+    _job, log_p, st_p = _install_paths(item)
+    try:
+        with open(st_p, encoding="utf-8") as f:
+            st = json.load(f)
+    except Exception:
+        return None
+    lines = []
+    try:
+        with open(log_p, encoding="utf-8", errors="replace") as f:
+            lines = f.read().splitlines()[-500:]
+    except Exception:
+        pass
+    # 창을 강제로 닫는 등 러너가 죽으면 running=True 로 남는다 → 실제 pid 로 확인
+    if st.get("running") and not _pid_alive(st.get("pid")):
+        st["running"] = False
+        st["code"] = st.get("code") if st.get("code") is not None else -1
+        lines.append("(설치 창이 종료되어 중단된 것으로 처리합니다)")
+    return {"running": bool(st.get("running")), "code": st.get("code"), "lines": lines}
+
+
+def _pid_alive(pid):
+    if not pid:
+        return False
+    try:
+        out = subprocess.run(["tasklist", "/FI", "PID eq %d" % int(pid)],
+                             capture_output=True, text=True, timeout=5).stdout
+        return str(pid) in out
+    except Exception:
+        return False
+
+
+def _spawn_install(item, cmds):
+    """설치를 **별도 콘솔 창의 독립 프로세스**로 띄운다.
+    서버 재시작으로 다운로드가 죽던 문제(daemon 스레드) 때문에 분리했다."""
+    os.makedirs(INSTALL_DIR, exist_ok=True)
+    job_p, log_p, st_p = _install_paths(item)
+    with open(job_p, "w", encoding="utf-8") as f:
+        json.dump({"item": item, "cmds": cmds, "log": log_p, "status": st_p}, f)
+    # 시작 상태를 서버가 먼저 찍어둔다 (러너가 뜨기 전 UI 공백 방지)
+    with open(st_p, "w", encoding="utf-8") as f:
+        json.dump({"item": item, "running": True, "code": None, "pid": None, "t": time.time()}, f)
+
+    env = os.environ.copy()
+    env.update(_load_env_vars())
+    env["PYTHONIOENCODING"] = "utf-8"
+    cmd = (_PYEXE if _PYEXE else ["py"]) + [INSTALL_RUNNER, job_p]
+    kwargs = {"env": env, "cwd": BASE, "close_fds": True}
+    if os.name == "nt":
+        # 새 콘솔 창 = 사용자가 진행을 직접 보고, 끝나면 창이 스스로 닫힌다
+        kwargs["creationflags"] = subprocess.CREATE_NEW_CONSOLE
+    else:
+        kwargs["start_new_session"] = True
+    subprocess.Popen(cmd, **kwargs)
+
 # 강도 스펙트럼 4장 생성 (선택 엔진: gpt-image=클라우드 / 그 외=로컬 diffusers)
 SPECTRUM_STATE = {"running": False, "images": None, "error": None, "log": []}
 _INTENS = [
@@ -610,23 +683,37 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(info)
         if p == "/api/hf/present":
             repo = (q.get("repo", [""])[0]) or ""
-            present, size = False, None
+            present, size, partial = False, None, False
             try:
                 from huggingface_hub import scan_cache_dir
                 for r in scan_cache_dir().repos:
                     if r.repo_id.lower() == repo.lower():
                         size = round(r.size_on_disk / 1e9, 2)
-                        present = r.size_on_disk > 5e8   # 0.5GB 미만은 메타데이터만 → 미다운로드로 간주
+                        # ★ 받다 만 걸 '있음'으로 보면 게이트가 잘못 열린다.
+                        #   scan_cache_dir 은 완료 blob 만 세므로 .incomplete 를 따로 확인한다.
+                        try:
+                            blobs = os.path.join(str(r.repo_path), "blobs")
+                            partial = any(f.endswith(".incomplete")
+                                          for f in os.listdir(blobs)) if os.path.isdir(blobs) else False
+                        except Exception:
+                            partial = False
+                        present = (r.size_on_disk > 5e8) and not partial
                         break
             except Exception:
                 pass
-            return self._json({"repo": repo, "present": present, "size": size})
+            return self._json({"repo": repo, "present": present, "size": size,
+                               "partial": partial})
         if p == "/api/spectrum/status":
             st = SPECTRUM_STATE
             return self._json({"running": st["running"], "images": st["images"],
                                "error": st["error"], "log": st["log"][-40:]})
         if p == "/api/install/status":
             item = (q.get("item", [""])[0]) or ""
+            # 디스크(러너가 쓰는 파일)를 우선 — 서버가 재시작돼도 진행이 보인다
+            disk = _install_read(item)
+            if disk is not None:
+                return self._json({"running": disk["running"], "code": disk["code"],
+                                   "lines": disk["lines"][-120:]})
             st = INSTALL_STATE.get(item)
             if not st:
                 return self._json({"running": False, "code": None, "lines": []})
@@ -763,11 +850,12 @@ class Handler(BaseHTTPRequestHandler):
                 import re
                 if not re.match(r"^[A-Za-z0-9._\-]+/[A-Za-z0-9._\-]+$", repo):
                     return self._json({"error": "잘못된 모델 id (org/name 형식)"}, 400)
+                # ★ 저장소 통째로(snapshot_download) 받으면 중복 형식까지 딸려와
+                #   sdxl-turbo 55.5GB / sd3.5-medium 48.9GB 가 된다. 실제 필요분만 받는다.
                 cmds = [
                     _PYEXE + ["-m", "pip", "install", "-U", "diffusers", "transformers",
                               "accelerate", "huggingface_hub"],
-                    _PYEXE + ["-c", "from huggingface_hub import snapshot_download; "
-                              "snapshot_download('%s'); print('DONE %s')" % (repo, repo)],
+                    _PYEXE + [os.path.join(BASE, "model_fetch.py"), repo],
                 ]
                 item = item or ("model:" + repo)   # 상태 키
             else:
@@ -775,11 +863,13 @@ class Handler(BaseHTTPRequestHandler):
             if not cmds:
                 return self._json({"error": "그 자리 설치 미지원 항목(수동 설치)"}, 400)
             with _install_lock:
-                cur = INSTALL_STATE.get(item)
+                cur = _install_read(item)
                 if cur and cur.get("running"):
                     return self._json({"started": True, "already": True})
-                INSTALL_STATE[item] = {"running": True, "code": None, "lines": []}
-            threading.Thread(target=_run_install, args=(item, cmds), daemon=True).start()
+                try:
+                    _spawn_install(item, cmds)
+                except Exception as e:
+                    return self._json({"error": "설치 창 실행 실패: " + str(e)[:150]}, 500)
             return self._json({"started": True})
 
         if p == "/api/hf/login":

@@ -12,3 +12,6 @@ web/static/gen/
 # 파이썬 캐시
 __pycache__/
 *.pyc
+
+# 설치/다운로드 런타임 로그 (머신마다 다름)
+web/.install/

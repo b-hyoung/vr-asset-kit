@@ -35,7 +35,12 @@ use_offload = bool(size_gb and free_gb and size_gb * 1.15 > free_gb)
 print("모델 ~%.1fGB / 여유 VRAM ~%.1fGB → %s" % (
     size_gb or -1, free_gb, "CPU 오프로드(안전·느림)" if use_offload else "GPU 직접(빠름)"), flush=True)
 
-pipe = AutoPipelineForText2Image.from_pretrained(job["repo"], torch_dtype=dtype)
+# model_fetch.py 가 fp16 변형을 우선 받으므로 로드도 fp16 변형을 먼저 시도한다.
+# (변형을 안 맞추면 "받아뒀는데 파일이 없다"고 실패한다)
+try:
+    pipe = AutoPipelineForText2Image.from_pretrained(job["repo"], torch_dtype=dtype, variant="fp16")
+except Exception:
+    pipe = AutoPipelineForText2Image.from_pretrained(job["repo"], torch_dtype=dtype)
 offloaded = False
 if torch.cuda.is_available():
     if use_offload:
