@@ -6,9 +6,11 @@
 ## 범용 도구 (그대로 재사용)
 | 스크립트 | 역할 | 실행 위치 |
 |---|---|---|
-| `gen_prop_image.py <key>` | gpt-image-1 컨셉 이미지 (단일객체·투명배경). PROMPTS 딕셔너리에 프롬프트 | 일반 파이썬(.env 키) |
+| `gen_prop_image.py <name> "<desc>" [style] [--engine ...]` | 컨셉 이미지 1장 (클라우드 gpt-image-1 / 로컬 diffusers). 여러 장이면 아래 배치판을 쓸 것 | 일반 파이썬(.env 키) |
 | `gen_prop_3d.py <img> <out.glb>` | 독립 Hunyuan3D-2 단일 image→3D (shape+paint+감폴리) | **Hunyuan3D-2 venv** |
 | `gen_props_batch.py` | 여러 개 배치 (모델 1회 로드). PROPS 리스트 편집 | **Hunyuan3D-2 venv** |
+| `gen_props_image_batch.py <BASE> [only=a,b]` | **로컬 diffusers 컨셉 이미지 배치** — 파이프 1회 로드, `<BASE>/props.json` 에서 프롬프트·엔진을 읽음. **CLIP 77토큰 초과 시 생성 중단**(구도·배제 슬롯이 조용히 잘리는 사고 방지) | diffusers 있는 venv |
+| `gen_props_3d_batch.py <BASE> [only=a,b]` | **image→3D 배치** — 엔진/subfolder 를 `props.json` 에서 읽어 `state.engine_choices` 를 그대로 따름. 이미 만든 glb 는 건너뛰어 **재개 가능**, texgen 실패 시 shape-only 폴백 | **Hunyuan3D-2 venv** |
 | `ue_exec.py <script.py> "<desc>"` | 언리얼 execute_script REST 브릿지(:3000) + 폴링 | 일반 파이썬 |
 | `import_ai_all.py` | glb 일괄 임포트 + Nanite off + `M_*_AI` 텍스처 머티리얼 생성 (aiprops.json 읽음) | ue_exec 경유(UE python) |
 | `import_shoot.py` | glb 1개 임포트+스폰+SceneCapture QC 렌더 (aiprop.json) | ue_exec 경유 |

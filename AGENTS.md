@@ -31,7 +31,7 @@
 | `web/server.py` · `web/static/` | 웹 콘솔(준비·게이트·진단·모델선택) |
 | `SETUP.md` | 환경 준비 + V1~V4 실측 셋업(OpenAI·Hunyuan3D 로컬·UnrealClaude) |
 | `scripts/` | 실제로 통한 스크립트 (gen_prop_image·gen_prop_3d·import_*·ue_exec·fix_ai_mat) |
-| `scripts/setup_hunyuan_texgen.ps1` | texgen 커스텀 확장 원클릭 빌드(C2872 회피) |
+| `scripts/setup_hunyuan_texgen.ps1` | texgen 커스텀 확장 원클릭 빌드(C2872 회피 + **GPU arch 자동 감지**) |
 | `lessons.md` | 실패에서 승격된 규칙 로그 |
 | `harness/` · `templates/` | (구) MD-루프용 참조 문서 — 웹 흐름과 중복. 웹 흐름이 우선. |
 

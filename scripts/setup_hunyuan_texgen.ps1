@@ -50,6 +50,34 @@ $env:CL = "/DTORCH_STABLE_ONLY $($env:CL)"
 $env:PYTHONUTF8 = "1"
 Write-Host "적용: CL=$($env:CL) / PYTHONUTF8=1" -ForegroundColor Cyan
 
+# 2.5) ★ TORCH_CUDA_ARCH_LIST — 실측 08-31에서 이게 빠져 하루를 날렸다.
+#   빠뜨리면 이 GPU 아키텍처(cubin)가 fatbinary 에 안 들어가고, 런타임에
+#     RuntimeError: CUDA error: no kernel image is available for execution on the device
+#   로 터진다. 메시지가 드라이버/버전 문제처럼 보이지만 실체는 "이 GPU용 커널이 없음"이다.
+#   게다가 비동기 보고라 스택트레이스가 엉뚱한 conv2d 를 가리킨다
+#   → 진짜 위치를 보려면 CUDA_LAUNCH_BLOCKING=1 로 재현할 것.
+if (-not $env:TORCH_CUDA_ARCH_LIST) {
+    $cc = ""
+    try {
+        $cc = (& nvidia-smi --query-gpu=compute_cap --format=csv,noheader | Select-Object -First 1).Trim()
+    } catch {}
+    if ($cc) { $env:TORCH_CUDA_ARCH_LIST = $cc; Write-Host "GPU compute capability 자동감지: $cc" -ForegroundColor Cyan }
+    else { Write-Host "⚠ compute capability 감지 실패 — TORCH_CUDA_ARCH_LIST 를 직접 지정하세요(예 8.6)" -ForegroundColor Yellow }
+}
+Write-Host "적용: TORCH_CUDA_ARCH_LIST=$($env:TORCH_CUDA_ARCH_LIST)" -ForegroundColor Cyan
+
+# 2.6) CUDA_HOME — nvcc 가 PATH 에 없으면 툴킷을 찾아 붙인다
+if (-not $env:CUDA_HOME) {
+    $tk = Get-ChildItem "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA" -Directory -ErrorAction SilentlyContinue |
+          Sort-Object Name -Descending | Select-Object -First 1
+    if ($tk) { $env:CUDA_HOME = $tk.FullName }
+}
+if ($env:CUDA_HOME) {
+    $env:PATH = "$env:CUDA_HOME\bin;$env:PATH"
+    $env:DISTUTILS_USE_SDK = "1"
+    Write-Host "적용: CUDA_HOME=$env:CUDA_HOME" -ForegroundColor Cyan
+}
+
 # torch 존재 확인
 & $Py.Split(' ')[0] $Py.Split(' ')[1..9] -c "import torch;print('torch',torch.__version__,'cuda',torch.cuda.is_available())"
 if (-not $?) { Write-Host "❌ torch import 실패 — venv/torch(CUDA) 먼저 준비" -ForegroundColor Yellow; exit 1 }
