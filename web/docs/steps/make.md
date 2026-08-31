@@ -19,6 +19,20 @@
 - **엔진이 `Hunyuan3D-2mini`면 subfolder 필요**: `hunyuan3d-dit-v2-mini-turbo`. full(`Hunyuan3D-2`)과 혼동 금지 — 정확히 지정.
 - 실행은 반드시 **Hunyuan 레포 전용 `.venv`** 로.
 
+## 3D 모델 VRAM 감당 기준 (★ 디스크 용량 ≠ VRAM)
+**핵심: shape(메시 생성) VRAM 과 texgen(텍스처 베이킹) VRAM 은 완전히 다르다. texgen이 진짜 병목.**
+
+| 모델 | 디스크 | shape VRAM | texgen VRAM | 16GB에서 |
+|---|---|---|---|---|
+| Hunyuan3D-2 (full) | ~28GB | ~6GB | **peak 16GB 근처** | shape ✅ 쾌적 / **texgen ⚠️ 빠듯 → offload·해상도↓** |
+| Hunyuan3D-2mini (turbo) | ~8GB | ~5GB | ~8–10GB | ✅ 여유 (shape·texgen 모두) |
+
+- **8GB GPU**: mini shape-only 권장(texgen은 빠듯 → cpu_offload 필수 or 클라우드).
+- **12GB GPU**: mini 쾌적 / full shape 가능 / full texgen은 offload 필수.
+- **16GB GPU**: full shape ✅. **full texgen은 peak가 16GB에 닿아 OOM 위험** → `enable_model_cpu_offload()` + 멀티뷰 해상도 낮추기. (이번 세션 실측: full texgen이 VRAM 최대 난관)
+- **24GB+**: full texgen까지 offload 없이 여유.
+- OOM 나면 순서: ① `enable_model_cpu_offload()` → ② `enable_attention_slicing()` → ③ 해상도/뷰 수 축소 → ④ mini로 교체 → ⑤ 클라우드 3D(Rodin/Hyper3D).
+
 ## 3D (Hunyuan3D-2 로컬) — 실행 전 준비
 
 **shape(메시)는 가중치만 있으면 되지만, texgen(텍스처 베이킹)은 CUDA/C++ 확장을 빌드해야 함.**

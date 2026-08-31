@@ -20,9 +20,9 @@
   ],
   "image_guide": "16GB VRAM 기준 — ✅쾌적(GPU직접,빠름): SDXL Turbo·SDXL 1.0·SD3.5 Medium / ⚠️오프로드(느림): Qwen·FLUX.1·SD3.5 Large / ❌버거움: FLUX.2. 빠른 반복은 gpt-image(클라우드)도 좋음.",
   "mesh": [
-    { "repo": "tencent/Hunyuan3D-2", "name": "Hunyuan3D-2", "tags": ["고품질", "대용량 28GB"],
-      "desc": "이미지→3D 최고 품질. 가중치 약 28GB. 게이트 아님(토큰 불필요)." },
-    { "repo": "tencent/Hunyuan3D-2mini", "name": "Hunyuan3D-2 mini", "tags": ["경량 8GB", "빠름"],
-      "desc": "경량판(약 8GB). 더 빠르고 가벼움. 프로토타이핑·저사양에 적합." }
+    { "repo": "tencent/Hunyuan3D-2", "name": "Hunyuan3D-2", "tags": ["고품질", "디스크 28GB", "shape 16GB✅", "texgen 16GB 빠듯⚠️"],
+      "desc": "이미지→3D 최고 품질. 디스크 약 28GB(≠VRAM). shape(메시): VRAM ~6GB→16GB 쾌적✅. texgen(텍스처): peak가 16GB 근처라 빠듯 → cpu_offload 필수·해상도 낮추기⚠️. 게이트 아님." },
+    { "repo": "tencent/Hunyuan3D-2mini", "name": "Hunyuan3D-2 mini", "tags": ["빠름", "디스크 8GB", "shape 8GB✅"],
+      "desc": "경량판(디스크 약 8GB, ≠VRAM). shape VRAM ~5GB→16GB 여유✅·저사양도 가능. turbo subfolder(hunyuan3d-dit-v2-mini-turbo) 필요. 프로토타이핑·빠른 반복용." }
   ]
 }
