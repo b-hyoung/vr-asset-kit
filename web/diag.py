@@ -289,8 +289,10 @@ def run(hunyuan_dir=None, env_file=None, image_repo=None):
     candidates = []
     if env_file:
         candidates.append(env_file)
+    if os.environ.get("VRKIT_ENV_FILE"):
+        candidates.append(os.environ["VRKIT_ENV_FILE"])
     candidates.append(os.path.join(WEB, ".env"))  # 웹에서 저장한 키 우선
-    candidates.append(os.path.join(USER, "Desktop", "bobs_project", "Core-CBT", ".env"))
+    candidates.append(os.path.join(USER, ".vrkit", ".env"))
     for p in candidates:
         try:
             if p and os.path.isfile(p):
@@ -346,9 +348,11 @@ def run(hunyuan_dir=None, env_file=None, image_repo=None):
 
     # Rodin/Hyper3D 키 (클라우드 3D 대안)
     rk, rk_where = False, ""
-    for p in [os.path.join(WEB, ".env"), os.path.join(USER, "Desktop", "bobs_project", "Core-CBT", ".env")]:
+    _rk_cands = ([os.environ["VRKIT_ENV_FILE"]] if os.environ.get("VRKIT_ENV_FILE") else []) + \
+                [os.path.join(WEB, ".env"), os.path.join(USER, ".vrkit", ".env")]
+    for p in _rk_cands:
         try:
-            if os.path.isfile(p):
+            if p and os.path.isfile(p):
                 with open(p, encoding="utf-8", errors="ignore") as f:
                     for line in f:
                         s = line.strip()

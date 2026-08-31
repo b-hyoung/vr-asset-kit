@@ -32,9 +32,11 @@ Chk "Blender (선택)" ($blenderDirs.Count -gt 0) ($(if ($blenderDirs) { $blende
 
 Write-Host "`n=== B. 이미지 생성 (OpenAI gpt-image-1) ===" -ForegroundColor Cyan
 $keyFound = $false; $keyWhere = ""
+# 키 탐색: -EnvFile → VRKIT_ENV_FILE → web\.env → ~\.vrkit\.env (프로젝트 경로 하드코딩 금지)
 $candidates = @()
 if ($EnvFile) { $candidates += $EnvFile }
-$candidates += @("$env:USERPROFILE\Desktop\bobs_project\Core-CBT\.env")
+if ($env:VRKIT_ENV_FILE) { $candidates += $env:VRKIT_ENV_FILE }
+$candidates += @("$PSScriptRoot\web\.env", "$env:USERPROFILE\.vrkit\.env")
 foreach ($p in $candidates) {
     if ($p -and (Test-Path $p)) {
         if (Select-String -Path $p -Pattern 'OPENAI_API_KEY\s*=\s*\S' -Quiet -ErrorAction SilentlyContinue) { $keyFound = $true; $keyWhere = $p; break }

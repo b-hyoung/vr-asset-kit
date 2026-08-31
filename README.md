@@ -43,7 +43,7 @@ AI가 `RUN.md`를 따라: 셋업확인 → 인테이크 질문 → **강도 스�
 `HARNESS.md` 형식:
 ```markdown
 # 하네스 참조
-이 프로젝트는 공용 하네스를 따른다: C:\Users\hunvr\Desktop\vr-harness\
+이 프로젝트는 공용 하네스를 따른다: <이 vr-harness 폴더의 절대경로>   # 예: C:\path\to\vr-harness\
 작업 전 반드시 읽을 것:
 - harness/meta.md (루프 설계 게이트)
 - harness/scene-loop.md (실행 절차)

@@ -3,10 +3,15 @@
 @UnrealClaude Script
 @Description: Find AI prop texture, build material, assign, re-render
 """
-import unreal, math, json
-SCR = r"C:\Users\ACE\AppData\Local\Temp\claude\C--Users-ACE-Desktop-Hanes\56f7e7e5-4eeb-45da-bfb1-eada2407f8b0\scratchpad"
-J = json.load(open(SCR+r"\aiprop.json", encoding="utf-8"))
-NAME = J["name"]; DEST = "/Game/Husamguk/AIProps/" + NAME
+import unreal, math, json, os
+# ★ 경로 하드코딩 금지 — 스크래치/게임경로는 환경변수/입력으로 받는다.
+#   VRKIT_SCRATCH: aiprop.json 이 있는 폴더 (없으면 임시폴더)
+#   VRKIT_GAME_PATH: 이 프로젝트의 /Game 경로 (없으면 aiprop.json의 game_path, 그것도 없으면 /Game/VRKit)
+SCR = os.environ.get("VRKIT_SCRATCH") or os.path.join(os.environ.get("TEMP", os.getcwd()), "vrkit")
+J = json.load(open(os.path.join(SCR, "aiprop.json"), encoding="utf-8"))
+NAME = J["name"]
+GAME = os.environ.get("VRKIT_GAME_PATH") or J.get("game_path") or "/Game/VRKit"
+DEST = GAME + "/AIProps/" + NAME
 ar = unreal.AssetRegistryHelpers.get_asset_registry()
 tex=None; mesh=None; mats=[]
 for a in ar.get_assets_by_path(DEST, recursive=True):
@@ -19,10 +24,10 @@ if not (tex and mesh):
     print("MISSING"); raise SystemExit
 mel = unreal.MaterialEditingLibrary
 tools = unreal.AssetToolsHelpers.get_asset_tools()
-mpath = "/Game/Husamguk/AIProps/M_%s_AI" % NAME
+mpath = GAME + "/AIProps/M_%s_AI" % NAME
 if unreal.EditorAssetLibrary.does_asset_exist(mpath):
     unreal.EditorAssetLibrary.delete_asset(mpath)
-m = tools.create_asset("M_%s_AI"%NAME, "/Game/Husamguk/AIProps", unreal.Material, unreal.MaterialFactoryNew())
+m = tools.create_asset("M_%s_AI"%NAME, GAME + "/AIProps", unreal.Material, unreal.MaterialFactoryNew())
 ts = mel.create_material_expression(m, unreal.MaterialExpressionTextureSample, -350, 0)
 ts.set_editor_property("texture", unreal.EditorAssetLibrary.load_asset(tex))
 mel.connect_material_property(ts, "RGB", unreal.MaterialProperty.MP_BASE_COLOR)

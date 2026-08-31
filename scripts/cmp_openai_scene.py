@@ -4,13 +4,23 @@
 # usage: py cmp_openai_scene.py <village_render.png>
 import json, base64, os, sys, urllib.request
 
-ENV = r"C:\Users\ACE\Desktop\bobs_project\Core-CBT\.env"
-key=None
-with open(ENV, encoding="utf-8") as f:
-    for line in f:
-        s=line.strip()
-        if s.startswith("OPENAI_API_KEY"):
-            key=s.split("=",1)[1].strip().strip('"').strip("'"); break
+def _key():  # 환경변수 → VRKIT_ENV_FILE → web/.env → scripts/.env → ~/.vrkit/.env (프로젝트 경로 하드코딩 금지)
+    if os.environ.get("OPENAI_API_KEY"): return os.environ["OPENAI_API_KEY"]
+    h=os.path.dirname(os.path.abspath(__file__)); c=[]
+    if os.environ.get("VRKIT_ENV_FILE"): c.append(os.environ["VRKIT_ENV_FILE"])
+    c+=[os.path.join(h,"..","web",".env"), os.path.join(h,".env"),
+        os.path.join(os.path.expanduser("~"),".vrkit",".env")]
+    for p in c:
+        try:
+            if p and os.path.isfile(p):
+                for line in open(p,encoding="utf-8",errors="ignore"):
+                    s=line.strip()
+                    if s.startswith("OPENAI_API_KEY") and "=" in s:
+                        v=s.split("=",1)[1].strip().strip('"').strip("'")
+                        if v: return v
+        except Exception: pass
+    return None
+key=_key()
 if not key: print(json.dumps({"error":"NO_KEY"})); sys.exit(1)
 
 RENDER = sys.argv[1] if len(sys.argv)>1 else "village.png"

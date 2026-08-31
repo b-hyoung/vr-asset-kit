@@ -3,13 +3,15 @@
 @UnrealClaude Script
 @Description: Import an AI prop glb, disable Nanite, spawn+render for QC
 """
-import unreal, math, json
-
-SCR = r"C:\Users\ACE\AppData\Local\Temp\claude\C--Users-ACE-Desktop-Hanes\56f7e7e5-4eeb-45da-bfb1-eada2407f8b0\scratchpad"
-with open(SCR+r"\aiprop.json", encoding="utf-8") as f:
+import unreal, math, json, os
+# ★ 경로 하드코딩 금지 — 환경변수로 받는다.
+#   VRKIT_SCRATCH: aiprop.json 폴더 / VRKIT_GAME_PATH: 이 프로젝트 /Game 경로(기본 /Game/VRKit)
+SCR = os.environ.get("VRKIT_SCRATCH") or os.path.join(os.environ.get("TEMP", os.getcwd()), "vrkit")
+GAME = os.environ.get("VRKIT_GAME_PATH") or "/Game/VRKit"
+with open(os.path.join(SCR, "aiprop.json"), encoding="utf-8") as f:
     J = json.load(f)
 GLB = J["glb"]; NAME = J["name"]
-DEST = "/Game/Husamguk/AIProps/" + NAME
+DEST = GAME + "/AIProps/" + NAME
 
 # import
 task = unreal.AssetImportTask()

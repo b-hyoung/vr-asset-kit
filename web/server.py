@@ -318,20 +318,37 @@ def _run_spectrum(engine, repo, topic, bg, pid=None):
                 pass
 
 
-def _openai_key():
-    for p in [os.path.join(BASE, ".env"),
-              os.path.join(os.path.expanduser("~"), "Desktop", "bobs_project", "Core-CBT", ".env")]:
+def _env_file_candidates():
+    """키(.env) 탐색 후보 — 특정 프로젝트 경로 하드코딩 금지.
+    우선순위: VRKIT_ENV_FILE(환경변수 경로) → web/.env → ~/.vrkit/.env"""
+    c = []
+    if os.environ.get("VRKIT_ENV_FILE"):
+        c.append(os.environ["VRKIT_ENV_FILE"])
+    c.append(os.path.join(BASE, ".env"))
+    c.append(os.path.join(os.path.expanduser("~"), ".vrkit", ".env"))
+    return c
+
+
+def _key_from(name):
+    """환경변수 우선, 없으면 .env 후보들에서 name 읽기."""
+    if os.environ.get(name):
+        return os.environ[name]
+    for p in _env_file_candidates():
         try:
-            if os.path.isfile(p):
+            if p and os.path.isfile(p):
                 for line in open(p, encoding="utf-8", errors="ignore"):
                     s = line.strip()
-                    if s.startswith("OPENAI_API_KEY") and "=" in s:
+                    if s.startswith(name) and "=" in s:
                         v = s.split("=", 1)[1].strip().strip('"').strip("'")
                         if v:
                             return v
         except Exception:
             pass
-    return os.environ.get("OPENAI_API_KEY")
+    return None
+
+
+def _openai_key():
+    return _key_from("OPENAI_API_KEY")
 
 
 def _load_env_vars():

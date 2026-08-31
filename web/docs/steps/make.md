@@ -9,10 +9,13 @@
 
 > 실측: 프롬프트 빈칸을 모델이 임의로 채우면 원하는 이미지가 안 나옴 → 슬롯 다 채우고 생성.
 
-## 이미지 생성 (실측 08-30) — 고품질·topic무관
+## 이미지 생성 (실측 08-30) — 고품질·topic무관·로컬/클라우드
 - **`scripts/gen_prop_image.py` 는 topic 무관**: 에셋 설명을 인자/`out/props.json`으로 받는다. **특정 예시(후삼국 등) 하드코딩 금지** — 하드코딩하면 주제와 무관한 이미지가 나와 "퀄리티 낮음"으로 보임.
-- 품질 고정: **gpt-image-1 · 1024 · `quality:"high"` · 투명배경** + 공통 STUDIO 템플릿(단일객체·아이소3/4·균일광·고디테일).
-- **투명 요청에도 어두운 배경이 올 때가 있음** → downstream **rembg가 배경 제거**하므로 무해. 굳이 재생성 말 것.
+- **엔진 선택**(비용 0 로컬 or 클라우드): `--engine <repo>` (로컬 diffusers) / `--engine gpt-image` (클라우드). `out/props.json` 항목의 `engine`/`repo`, 또는 env `VRKIT_IMAGE_ENGINE` 로도 지정.
+  - 로컬: gen_spectrum 과 동일 안전장치(모델크기 vs 여유 VRAM 오프로드·slicing·OOM 폴백). 컨셉은 Hunyuan 입력이라 화질 중요 → **SDXL 1.0**(비게이트, 28스텝, 768px) 권장. 배경은 불투명 → **rembg 제거**.
+  - 클라우드: **gpt-image-1 · 1024 · `quality:"high"` · 투명배경**. 키 필요, 장당 과금.
+- 공통 STUDIO 템플릿(단일객체·아이소3/4·균일광·고디테일) 자동 부착.
+- **키 탐색**: `OPENAI_API_KEY` → `VRKIT_ENV_FILE` → `web/.env` → `~/.vrkit/.env` (특정 프로젝트 경로 하드코딩 금지).
 
 ## 3D 생성 (실측 08-30) — 실행 함정
 - **백그라운드 실행 시 cwd를 못 잡아 `hy3dgen` import 실패** → 스크립트 상단에 **레포 경로 명시 + `os.chdir(repo)`**.

@@ -19,5 +19,5 @@
 ## 실측 함정 (08-30~31) — 셋업·경로
 - **`python`이 깨져 있음 → 반드시 `py` 사용** (기존 메모리 규칙).
 - **계약서·state.json은 홈이 아니라 레포에 있음**: `Desktop/VR제작킷/vr-harness/`. 경로 하드코딩 말고 레포 기준으로 찾을 것.
-- **OpenAI 키가 셸 환경변수에 없을 수 있음** → `web/.env` 또는 `bobs_project/Core-CBT/.env`에서 읽음(스크립트가 자동 폴백).
+- **OpenAI 키 탐색 순서**(스크립트·서버 공통, 특정 프로젝트 경로 하드코딩 금지): 환경변수 `OPENAI_API_KEY` → 환경변수 `VRKIT_ENV_FILE`(경로) → `web/.env` → `~/.vrkit/.env`. 키는 `web/.env`(git 제외)에 두면 됨(`web/.env.example` 참고).
 - **hy3dgen은 시스템 `py`에 없음 → Hunyuan 레포 전용 `.venv` 사용.** 3D/텍스처 스크립트는 그 venv로 실행.
