@@ -11,6 +11,9 @@
 | 2026-08-21 | 후삼국 | AI가 산출물을 스스로 합격 처리하려 함 | 관통 원칙 — 자기 채점 금지, 판정은 사용자 |
 | 2026-08-22 | 후삼국 | 프롬프트 빈칸을 모델이 임의로 채워 원하는 이미지가 안 나옴 | `questions.md` — 슬롯 8개 미충족 시 생성 금지, 배제 슬롯(7)이 최우선 |
 | 2026-08-24 | — | 하네스가 후삼국 프로젝트 안에 묶여 있어 새 프로젝트에 재사용 불가 | 하네스를 `vr-harness/`로 분리, 프로젝트는 `HARNESS.md`로 참조 |
+| 2026-08-31 | 철기제작소 | SDXL 프롬프트가 CLIP 77토큰을 넘겨 **뒤에 붙인 구도·배제 슬롯이 통째로 잘림**. 모델은 앞부분만 보고 배경 있는 장면을 그림 — 슬롯을 채웠는데도 슬롯이 없는 것과 같은 결과 | `gen_props_image_batch.py` — 생성 전 토큰 수를 세어 77 초과면 **생성 중단**. 구도·배제를 프롬프트 앞쪽에 배치 |
+| 2026-08-31 | 철기제작소 | turbo 계열은 `guidance_scale=0` 이라 **negative_prompt 가 아예 무시된다**. 배제 슬롯을 negative 에 넣으면 조용히 사라짐 | 배제(슬롯7)는 turbo 에서 **positive 안에** 짧게 녹인다 |
+| 2026-08-31 | 철기제작소 | texgen 이 `no kernel image is available` 로 사망. 실체는 **custom_rasterizer 프리빌트 휠에 이 GPU(sm_86) 커널이 없음**. 커널 실패가 비동기 보고돼 스택트레이스가 엉뚱한 diffusers `conv2d` 를 가리켰고, VRAM·cuDNN·onnxruntime 을 차례로 헛짚음 | `setup_hunyuan_texgen.ps1` — **`TORCH_CUDA_ARCH_LIST` 자동 감지 추가**(이게 없었다). CUDA 확장 문제는 **`CUDA_LAUNCH_BLOCKING=1`** 로 진짜 위치부터 확인 |
 
 ## 아직 검증되지 않은 것 (규칙 아님)
 

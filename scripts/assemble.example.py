@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 @UnrealClaude Script
-@Description: (예시 템플릿) layout.json 으로 마을 조립(houses+props+dusk) 후 렌더.
+@Description: (예시 템플릿) layout.json 으로 마을 조립(houses+props) 후 렌더.
+  조명은 layout.json 의 "lighting" 에 프리셋이 실려 있을 때만 적용한다 — 노을 고정 아님.
   ★ 이 파일은 .example 템플릿이다. 아래 /Game/Husamguk/... 에셋 경로는 후삼국 예시이며,
     실제 프로젝트에서는 그 프로젝트의 콘텐츠 루트로 교체해야 한다(하드코딩 그대로 쓰지 말 것).
     권장: 환경변수 VRKIT_UE_CONTENT_ROOT 로 콘텐츠 루트를 주입하도록 파라미터화(추후).
@@ -330,36 +331,45 @@ except Exception as e:
   open(SCR+r"\asm_err.txt","w",encoding="utf-8").write("PROPS:\n"+traceback.format_exc())
   raise
 
-# ---- dusk lighting ----
+# ---- lighting (선택된 프리셋만) ----
+# ⛔ 노을 고정 아님. layout.json 의 "lighting" 에 들어온 것만 적용한다.
+#    없으면 조명을 건드리지 않는다 (프리셋 표: web/lighting.json,
+#    보내는 쪽: scripts/apply_lighting.py → scripts/ue/apply_lighting.py).
 def find(cn):
     for a in eas.get_all_level_actors():
         if a.get_class().get_name()==cn: return a
     return None
+def _lin(v):
+    return unreal.LinearColor(float(v[0]),float(v[1]),float(v[2]), float(v[3]) if len(v)>3 else 1.0)
 try:
-  sp,sy,si = L.get("sun",[-8,55,3.0])
-  dl=find("DirectionalLight")
-  if dl:
-    dl.set_actor_rotation(unreal.Rotator(0.0,float(sp),float(sy)),False)
-    dc=dl.get_component_by_class(unreal.DirectionalLightComponent)
-    dc.set_editor_property("intensity",float(si)); dc.set_light_color(unreal.LinearColor(1.0,0.72,0.47,1.0))
-    try:
-        dc.set_editor_property("use_temperature", True); dc.set_editor_property("temperature", 3800.0)
-    except Exception: pass
-  # ⛔ 기본 SkyLight는 절대 건드리지 않는다 (사용자 지시 2026-08-24). 기본 그대로 둔다.
-  fg=find("ExponentialHeightFog")
-  if fg:
-    fc=fg.get_component_by_class(unreal.ExponentialHeightFogComponent)
-    def _fog(prop,val):
-        try: fc.set_editor_property(prop,val)
+  LIGHT = L.get("lighting") or {}
+  if isinstance(LIGHT, str):
+      LIGHT = {"id": LIGHT}          # id 만 온 경우 → 값이 없으니 적용하지 않는다
+  sun = LIGHT.get("sun"); fog = LIGHT.get("fog")
+  if not sun and not fog:
+    print("LIGHT skip | 프리셋 미지정(id=%s) — 조명 미개입" % (LIGHT.get("id") or "-"))
+    if L.get("sun"):
+      print("LIGHT note | 옛 layout 의 \"sun\" 은 무시한다 — 조명은 \"lighting\" 프리셋으로만 준다")
+  else:
+    print("LIGHT preset | id=%s" % (LIGHT.get("id") or "-"))
+    dl=find("DirectionalLight")
+    if sun and dl:
+      dl.set_actor_rotation(unreal.Rotator(0.0,float(sun.get("pitch",-3.0)),float(sun.get("yaw",0.0))),False)
+      dc=dl.get_component_by_class(unreal.DirectionalLightComponent)
+      if sun.get("intensity") is not None: dc.set_editor_property("intensity",float(sun["intensity"]))
+      if sun.get("color"): dc.set_light_color(_lin(sun["color"]))   # ★ FColor 위치인자는 BGRA로 뒤집힌다
+      if sun.get("temperature") is not None:
+        try:
+          dc.set_editor_property("use_temperature", True)
+          dc.set_editor_property("temperature", float(sun["temperature"]))
         except Exception: pass
-    _fog("fog_density",0.014)
-    _fog("fog_height_falloff",0.28)
-    _fog("directional_inscattering_color", unreal.LinearColor(1.0,0.45,0.15,1.0))
-    _fog("directional_inscattering_exponent", 20.0)
-    _fog("directional_inscattering_start_distance", 300.0)
-    _fog("volumetric_fog", True)
-    _fog("volumetric_fog_scattering_distribution", 0.8)
-    _fog("volumetric_fog_extinction_scale", 1.2)
+    # ⛔ 기본 SkyLight는 절대 건드리지 않는다 (사용자 지시 2026-08-24). 기본 그대로 둔다.
+    fga=find("ExponentialHeightFog")
+    if fog and fga:
+      fc=fga.get_component_by_class(unreal.ExponentialHeightFogComponent)
+      for k,v in fog.items():
+        try: fc.set_editor_property(k, _lin(v) if isinstance(v,list) else v)
+        except Exception: pass
 
   # ---- render ----
   cx,cy,cz,tx,ty,tz,fov = L.get("cam",[-2600,-2100,1050,200,0,150,72])

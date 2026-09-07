@@ -242,3 +242,27 @@ code{font-family:var(--mono);font-size:12px;background:#0c0f13;border:1px solid 
 .modal .row{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 .hint{color:var(--faint);font-size:11px;margin-top:6px}
 .empty{color:var(--faint);text-align:center;padding:40px 0;font-size:13px}
+
+/* 참고 이미지 드롭존 — 클릭해서 고르거나 끌어다 놓는다 */
+.dropzone{
+  margin-top:8px;border:2px dashed var(--line);border-radius:12px;background:#0c0f13;
+  min-height:170px;padding:14px;cursor:pointer;transition:border-color .12s,background .12s;
+  display:flex;flex-direction:column;justify-content:center;
+}
+.dropzone:hover{border-color:var(--accent)}
+.dropzone.over{border-color:var(--accent);background:#122029}
+.dropzone.busy{cursor:progress;opacity:.7}
+.dz-hint{text-align:center;color:var(--dim);pointer-events:none}
+.dz-hint .dz-big{display:block;font-size:26px;margin-bottom:6px;opacity:.75}
+.dz-hint .dz-main{color:var(--ink);font-weight:700;font-size:13.5px}
+.dz-hint .dz-sub{font-size:12px;color:var(--faint);margin-top:3px}
+.dz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.dz-item{position:relative}
+.dz-more{grid-column:1/-1;text-align:center;color:var(--faint);font-size:12px;margin-top:2px;pointer-events:none}
+
+/* 배경 참고 이미지 — 한 장을 상자 안에 크게 */
+.dz-single{position:relative;max-width:420px;margin:0 auto}
+.dz-single img{display:block;width:100%;height:auto;border-radius:9px;border:2px solid var(--accent)}
+.dz-single .dz-del{position:absolute;top:6px;right:6px;padding:0 7px}
+.dz-single .dz-cap{position:absolute;left:8px;bottom:8px;background:rgba(4,18,28,.82);color:#fff;
+  font-size:12px;font-weight:700;padding:2px 8px;border-radius:8px}

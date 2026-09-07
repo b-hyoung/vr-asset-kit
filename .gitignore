@@ -12,3 +12,11 @@ web/static/gen/
 # 파이썬 캐시
 __pycache__/
 *.pyc
+
+# 설치/다운로드 런타임 로그 (머신마다 다름)
+web/.install/
+
+# AI 에이전트 스킬 설치본 (npx skills add 등) — 각자 자기 환경에 설치한다
+.agents/
+.claude/skills/
+skills-lock.json

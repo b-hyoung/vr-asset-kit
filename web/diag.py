@@ -27,7 +27,8 @@ STAGES = [
 # 항목 이름 → 어느 단계에서 필요한지
 # CUDA/venv 는 기반(초기 설치), Blender 는 분석·블록아웃용이라 기반의 선택 항목.
 NAME_STAGE = {
-    "python (py 포함)": "base", "node": "base", "git": "base", "uv": "base",
+    "python (py 포함)": "base", "git": "base", "uv": "base",
+    "node": "unreal",          # 언리얼 브리지 실행용 — 기반환경에 두면 시작부터 막힌 것처럼 보인다
     "CUDA / GPU (nvidia-smi)": "base", "PyTorch (GPU)": "base",
     "Blender (선택·분석)": "base",
     "OPENAI_API_KEY": "image",
@@ -64,19 +65,23 @@ GUIDES = {
         "1. **NVIDIA 그래픽 드라이버** 최신: https://www.nvidia.com/Download/index.aspx "
         "(또는 GeForce Experience로 업데이트)\n"
         "2. **CUDA Toolkit 12.x**: https://developer.nvidia.com/cuda-downloads "
-        "→ Windows → exe(local). PyTorch가 요구하는 버전(cu121 등)에 맞춰.\n"
+        "→ Windows → exe(local). PyTorch 휠과 맞춰(현재 cu126).\n"
         "3. 설치 후 재부팅\n\n"
         "**확인**\n```\nnvidia-smi\n```\n→ GPU 이름·드라이버·`CUDA Version` 표가 뜨면 드라이버 OK.\n"
         "```\nnvcc --version\n```\n→ `release 12.x` 나오면 Toolkit OK.",
     "PyTorch (GPU)":
-        "## PyTorch (GPU) — 로컬 FLUX/Hunyuan 실행 엔진\n"
-        "*gpt-image·Rodin(클라우드)만 쓰면 지금 안 해도 됩니다.*\n\n"
-        "**설치** (CUDA 12.1 빌드; 메인 파이썬 또는 venv)\n"
-        "```\npip install torch --index-url https://download.pytorch.org/whl/cu121\n```\n"
-        "venv로 격리(권장):\n"
-        "```\npy -3 -m venv venv\nvenv\\Scripts\\activate\npip install torch --index-url https://download.pytorch.org/whl/cu121\n```\n\n"
-        "**확인**\n```\npython -c \"import torch;print(torch.__version__, torch.cuda.is_available())\"\n```\n"
-        "→ `2.x.x True` 나오면 성공. (False면 드라이버/CUDA 버전 불일치)",
+        "## PyTorch (GPU) — 로컬 모델을 GPU로 돌리는 엔진\n"
+        "**로컬 모델이 기본값이라 사실상 필수입니다.** 없으면 모델 수십 GB 를 받고도 "
+        "그래픽카드를 못 쓰고 CPU 로 돌아 몇십 배 느려집니다 — **에러가 안 나서 눈치채기 어렵습니다.**\n"
+        "*gpt-image·Rodin(클라우드)만 쓸 거면 건너뛰어도 됩니다.*\n\n"
+        "**설치** (위 ⚡ 버튼이 이 명령을 그대로 실행합니다)\n"
+        "```\npy -m pip install -U torch --index-url https://download.pytorch.org/whl/cu126\n```\n"
+        "⚠️ **cu121 인덱스를 쓰지 마세요.** 거긴 torch 2.5.1 까지밖에 없어 "
+        "최신 torch 를 조용히 다운그레이드시키고 diffusers/transformers 와 깨집니다 (실측 2026-09).\n\n"
+        "**확인**\n```\npy -c \"import torch;print(torch.__version__, torch.cuda.is_available())\"\n```\n"
+        "→ `2.x.x+cu126 True` 나오면 성공.\n"
+        "- `+cpu` 로 끝나면 **CPU 빌드**입니다 — 위 명령을 다시 실행하세요.\n"
+        "- `False` 면 그래픽 드라이버가 낮습니다 → 위 'CUDA / GPU' 항목부터.",
     "Blender (선택·분석)":
         "## Blender (선택 — 분석/블록아웃)\n"
         "*3D 생성은 Hunyuan 담당. Blender는 레퍼런스·블록아웃·검수용.*\n\n"
@@ -222,15 +227,18 @@ def spec():
     items = [
         {"name": "python (py 포함)", "required": True, "need": "모든 스크립트 실행"},
         {"name": "CUDA / GPU (nvidia-smi)", "required": True, "need": "이미지·3D GPU 가속 — NVIDIA 드라이버+CUDA"},
-        {"name": "PyTorch (GPU)", "required": False, "need": "로컬 FLUX/Hunyuan 돌릴 때 필요 · 지금은 미뤄도 됨"},
-        {"name": "node", "required": False, "need": "MCP 브릿지 실행"},
-        {"name": "git", "required": False, "need": "버전관리 (선택)"},
+        # ★ 없으면 수십 GB 를 받고도 CPU 로 돌아 '느리기만 하고 에러는 없는' 상태가 된다(실측 2026-09).
+        #   로컬 모델이 기본값이므로 미룰 수 있는 항목이 아니다.
+        {"name": "PyTorch (GPU)", "required": True, "need": "로컬 모델 필수 — 없으면 GPU 를 못 쓰고 CPU 로 돌아감"},
+        {"name": "node", "required": False, "need": "언리얼 브리지(unrealclaude) 실행용 — 임포트 단계에서만"},
+        {"name": "git", "required": False, "need": "선택 — 킷은 git 없이도 돌아감"},
         {"name": "uv", "required": False, "need": "파이썬 패키지 관리 (선택)"},
         {"name": "Blender (선택·분석)", "required": False, "need": "분석·블록아웃·검수용 (생성 아님)"},
         {"name": "OPENAI_API_KEY", "required": False, "need": "대안 — gpt-image-1 엔진 고를 때만"},
         {"name": "RODIN_API_KEY (Hyper3D)", "required": False, "need": "클라우드 3D(Rodin/Hyper3D) 쓸 때만"},
         {"name": "Unreal Engine", "required": False, "need": "UE_5.x — 임포트/배치/렌더"},
-        {"name": "unrealclaude MCP 등록", "required": True, "need": "언리얼 직접 조종"},
+        # 시작에는 필요 없다 — 언리얼 임포트 단계(STEP 7)에서 필요. 필수로 표시하면 시작을 못 한다.
+        {"name": "unrealclaude MCP 등록", "required": False, "need": "언리얼 직접 조종 — 임포트 단계에서만"},
         {"name": "Blender MCP 등록", "required": False, "need": "블록아웃/분석 — 언리얼 임포트·배치 전 편집(선택)"},
         {"name": "Unreal 에디터 실행중", "required": False, "need": "임포트 단계 전에 열 것"},
         {"name": "REST :3000 (execute_script)", "required": False, "need": "에디터+플러그인 서버"},
@@ -337,12 +345,17 @@ def run(hunyuan_dir=None, env_file=None, image_repo=None):
                 if r in ("cuda", "cpu"):
                     res, where = r, "venv"
                     break
+    # ★ 로컬 모델이 기본값이므로 필수. 없거나 CPU 빌드면 수십 GB 를 받고도 그래픽카드를 못 쓴다.
+    #   에러가 안 나고 '느리기만' 해서 눈치채기 어렵다 → 여기서 필수로 세운다(실측 2026-09).
     if res == "cuda":
-        add("", "PyTorch (GPU)", True, "GPU 인식 OK (%s)" % where)
+        add("", "PyTorch (GPU)", True, "GPU 인식 OK (%s)" % where, required=True)
     elif res == "cpu":
-        add("", "PyTorch (GPU)", False, "torch 있으나 GPU 인식 못함 (%s) — CUDA 빌드 확인" % where)
+        add("", "PyTorch (GPU)", False,
+            "torch 는 있으나 CPU 빌드 — GPU 를 못 씁니다. 이대로 두면 생성이 몇십 배 느려집니다 (%s)" % where,
+            required=True)
     else:
-        add("", "PyTorch (GPU)", False, "미설치 — 로컬 FLUX/Hunyuan 돌릴 때만 필요(지금은 미뤄도 됨)")
+        add("", "PyTorch (GPU)", False,
+            "미설치 — 로컬 모델을 쓰려면 필수. 아래 '설치'로 CUDA 빌드를 받으세요", required=True)
 
     # (로컬 3D 모델 상태는 3D 엔진 카드의 모델 선택 UI에서 경량 확인 — 진단에서 분리)
 
@@ -386,9 +399,10 @@ def run(hunyuan_dir=None, env_file=None, image_repo=None):
             has_blender = any("blender" in n.lower() for n in names)
     except Exception:
         pass
+    # 시작에는 필요 없다 — 언리얼 임포트 단계에서 필요. 필수로 세우면 이미지·3D 도 못 시작한 것처럼 보인다.
     add(D, "unrealclaude MCP 등록", has_unreal,
-        ".claude.json에 등록됨" if has_unreal else "미등록 — claude mcp add --scope user unrealclaude ...",
-        required=True)
+        ".claude.json에 등록됨" if has_unreal else "미등록 — 언리얼 임포트 단계에서 필요 (지금은 없어도 됨)",
+        required=False)
     # Blender MCP — 블록아웃/편집을 Claude로 조종 (언리얼 임포트·배치 전 단계). 선택.
     add(D, "Blender MCP 등록", has_blender,
         ".claude.json에 등록됨" if has_blender else "미등록 — Blender 블록아웃/분석 쓸 때만 (선택)",

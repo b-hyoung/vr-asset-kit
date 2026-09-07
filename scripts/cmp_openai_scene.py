@@ -28,9 +28,13 @@ def durl(p):
     with open(p,"rb") as fp: b=fp.read()
     return "data:image/png;base64,"+base64.b64encode(b).decode()
 
+# 조명은 사용자가 고른 프리셋을 따른다 → 심판 프롬프트에 "노을"을 고정하지 않는다.
+# 지금 조명을 알려주려면 VRKIT_LIGHTING_DESC (예: "at dusk", "at night lit by lanterns").
+LIGHT_DESC = os.environ.get("VRKIT_LIGHTING_DESC") or "under the level's current lighting"
+
 prompt = (
  "You are an environment art director reviewing a 3D blockout of a Later-Baekje era Korean hanok VILLAGE, "
- "viewed from outside a fortress wall at dusk. Judge ONLY the NATURALNESS of the LAYOUT/placement, not textures or poly detail.\n"
+ "viewed from outside a fortress wall " + LIGHT_DESC + ". Judge ONLY the NATURALNESS of the LAYOUT/placement, not textures or poly detail.\n"
  "A natural village should have: houses loosely clustered and varied in rotation (NOT a rigid grid, NOT all identical angle), "
  "a well near the houses, a water mill at the settlement edge (where a stream would run), a large sacred tree as a landmark with open space around it, "
  "and rocks scattered at the outskirts. Nothing should float above ground, overlap/intersect other objects, or be evenly/gridded.\n"
