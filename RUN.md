@@ -63,9 +63,11 @@
 - 액션: move/move_house/spread_houses/jitter_house_rot/scatter_houses (정렬 지적 정체 시 scatter, 1회가 최선)
 - 성공 판정 = **village.png 파일 존재**로 (UE 로그 길어 출력 파싱 불가)
 
-## 단계 6 — 조명·무드 (사람이 판정) — `pipeline.md §7` 노을 레시피
-- 태양 **pitch -2~-3 + temperature 3000~3800K**, 라이트 색은 **`set_light_color(LinearColor)`**
-- ⛔ **기본 SkyLight 절대 미개입.** 노을은 태양+Fog로
+## 단계 6 — 조명·무드 (사람이 고르고, 사람이 판정) — `pipeline.md §7` 프리셋 표
+- ⛔ **노을 고정 아님.** 시간대는 사용자가 고른다(웹 '조명·시간대 선택' → `inputs.lighting`).
+  안 골랐으면 **조명 미개입**. 적용: `py -u scripts/apply_lighting.py --project <pid>`
+- 예) 노을: 태양 **pitch -2~-3 + temperature 3000~3800K**, 라이트 색은 **`set_light_color(LinearColor)`**
+- ⛔ **기본 SkyLight 절대 미개입** (프리셋과 무관하게 항상)
 - 발광 머티리얼(창문·불꽃) + PointLight(등불·모닥불, `set_light_color` 따뜻)
 
 ## 단계 7 — 성벽/구도 (선택)

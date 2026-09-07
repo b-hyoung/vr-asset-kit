@@ -64,7 +64,16 @@ SceneCapture2D + SCS_FINAL_COLOR_LDR → capture_scene() → export_render_targe
 - 액션: move/move_house/spread_houses/jitter_house_rot/scatter_houses
 - 성공 판정은 **village.png 파일 존재**로 (출력 파싱은 UE 로그가 길어 잘림)
 
-## 7. 노을(골든아워) 레시피 — 값
+## 7. 조명 프리셋 — 값
+
+⛔ **노을은 기본값이 아니라 선택지 하나다.** 사용자가 고른 프리셋(`state.json` 의 `inputs.lighting`)만
+적용한다. 안 골랐으면 조명을 건드리지 않는다. 전체 값 표는 **`web/lighting.json`**,
+적용은 `py -u scripts/apply_lighting.py --project <pid>`.
+
+프리셋: `none`(미개입) · `dusk`(노을) · `noon`(한낮) · `overcast`(흐림·비) ·
+`dawn_fog`(새벽 안개) · `night_moon`(밤 달빛) · `indoor_neutral`(실내 중립).
+
+### 노을(골든아워) 값 — 실측
 - DirectionalLight: **pitch -2~-3**(태양 지평선), intensity ~6-7, **use_temperature=True + temperature 3000~3800K**
 - 라이트 색: **`comp.set_light_color(unreal.LinearColor(r,g,b,1))`** (0~1 float). ⛔`unreal.Color(r,g,b)` 위치인자는 **BGRA로 R↔B 뒤집힘 → 주황이 파랑**
 - ⛔ **기본 SkyLight 미개입** (사용자 하드룰). 노을은 태양+Fog로만

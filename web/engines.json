@@ -1,24 +1,39 @@
 {
-  "note": "단계별 선택 가능한 엔진/모델 레지스트리. flow.json 의 각 단계 engines[].role 이 여기를 참조.",
+  "note": "단계별 선택 가능한 엔진/모델 레지스트리. flow.json 의 각 단계 engines[].role 이 여기를 참조. default/default_repo 는 새 프로젝트의 시작값으로 서버가 심는다(사용자가 언제든 바꿀 수 있음).",
   "roles": {
     "image": {
       "label": "이미지 생성",
-      "choices": ["로컬 모델", "gpt-image-1"],
-      "default": "로컬 모델"
+      "choices": [
+        "로컬 모델",
+        "gpt-image-1"
+      ],
+      "default": "로컬 모델",
+      "default_repo": "stabilityai/sdxl-turbo"
     },
     "mesh_3d": {
       "label": "3D 생성 (이미지→3D)",
-      "choices": ["Hunyuan3D-2 (로컬)", "Rodin/Hyper3D (클라우드)"],
-      "default": "Hunyuan3D-2 (로컬)"
+      "choices": [
+        "Hunyuan3D-2 (로컬)",
+        "Rodin/Hyper3D (클라우드)"
+      ],
+      "default": "Hunyuan3D-2 (로컬)",
+      "default_repo": "tencent/Hunyuan3D-2mini"
     },
     "judge": {
       "label": "배치/품질 심판",
-      "choices": ["OpenAI", "Claude", "사용자 수동"],
+      "choices": [
+        "OpenAI",
+        "Claude",
+        "사용자 수동"
+      ],
       "default": "OpenAI"
     },
     "orchestration": {
       "label": "오케스트레이션/제어",
-      "choices": ["Claude", "GPT"],
+      "choices": [
+        "Claude",
+        "GPT"
+      ],
       "default": "Claude"
     }
   }

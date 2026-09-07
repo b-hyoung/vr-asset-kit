@@ -95,6 +95,37 @@ for n, img, _ in todo:
     imgs[n] = rembg(Image.open(img).convert("RGBA"))
     print("rembg", n, flush=True)
 
+# ── ★ 프리플라이트 (실측 08-31): 배경 제거 후 마스크가 화면을 꽉 채우면
+#   Hunyuan 은 실루엣을 못 잡고 **텍스처만 발린 큐브/판때기**를 만든다.
+#   컨셉 이미지가 프레임 가장자리까지 넘치면(=잘림) 정확히 이렇게 된다.
+#   메시 1개에 ~100초가 드니 GPU 를 쓰기 전에 여기서 걸러야 한다.
+import numpy as np  # noqa: E402
+
+#   임계값 근거(실측 08-31, 12개 중):
+#     · rock 면적 95.2% / cavewall 94.4% → 둘 다 큐브가 나왔다.
+#     · smith 는 테두리 50.4% 였지만(배경 돌벽) 메시는 멀쩡한 인물이었다.
+#   → **면적(cover)이 진짜 지표**다. 테두리는 참고용 경고로만 쓴다(과차단 방지).
+COVER_MAX = float(CFG.get("preflight_cover_max", 90.0))    # 이걸 넘으면 중단
+BORDER_WARN = float(CFG.get("preflight_border_warn", 30.0))  # 경고만
+bad = []
+print("--- 프리플라이트 (실루엣 확인) ---", flush=True)
+for n, _, _ in todo:
+    a = np.array(imgs[n])[..., 3] > 16
+    cover = a.mean() * 100
+    border = (a[0, :].mean() + a[-1, :].mean() + a[:, 0].mean() + a[:, -1].mean()) / 4 * 100
+    ng = cover > COVER_MAX
+    note = "❌ 실루엣 없음 → 큐브가 나온다" if ng else ("⚠ 테두리 닿음(배경 잔존 가능)" if border > BORDER_WARN else "ok")
+    print("  %-12s 면적 %5.1f%% 테두리 %5.1f%%  %s" % (n, cover, border, note), flush=True)
+    if ng:
+        bad.append(n)
+if bad:
+    print("\n중단: 위 에셋은 컨셉 이미지가 프레임을 넘쳐 3D 가 큐브로 나온다.", flush=True)
+    print("→ 여백을 두고 이미지를 다시 뽑은 뒤 재실행하세요 (gen_props_image_batch.py only=%s)"
+          % ",".join(bad), flush=True)
+    print("→ 그래도 강행하려면 props.json 에 \"preflight_cover_max\": 100 을 넣으세요.", flush=True)
+    if not os.environ.get("VRKIT_SKIP_PREFLIGHT"):
+        sys.exit(3)
+
 # ── 2) SHAPE
 print("=== SHAPEGEN load ===", flush=True)
 t0 = time.time()

@@ -5,8 +5,10 @@
 
 ## 실행
 
-바탕화면 `VR제작킷\VR웹_시작.bat` 더블클릭 → 서버 기동 후 크롬 앱모드 창이 열린다.
-(수동: `python vr-harness/web/server.py 8787` 후 브라우저에서 `http://127.0.0.1:8787`)
+레포 루트의 **`START.bat`** 더블클릭 → 웹 콘솔 기동 + 브라우저 열림 + Claude 실행까지 한 번에.
+(수동: 레포 루트에서 `py web/server.py 8787` 후 브라우저에서 `http://127.0.0.1:8787`)
+
+⚠️ `python` 아니라 **`py`** — AGENTS.md 하드룰.
 
 - **표준 라이브러리 전용** — pip 설치 불필요, 어떤 Python 3 에서도 실행.
 
@@ -30,7 +32,7 @@
 ## Claude로 실행 연결하기 (Phase B 사용법)
 
 1. 웹에서 프로젝트 생성 → STEP 1에서 주제·배경 직접 입력 → **확정**.
-2. Claude에게: "이 프로젝트의 `vr-harness/web/AGENT_CONTRACT.md`와 `projects/<id>/state.json`을 읽고 현재 단계를 진행해줘."
+2. Claude에게: "이 프로젝트의 `web/AGENT_CONTRACT.md`와 `projects/<id>/state.json`을 읽고 현재 단계를 진행해줘."
 3. Claude는 게이트 미통과 단계에서 멈추고 "웹에서 확정하세요"라고 안내한다.
 
 ## 차후 (범위 밖)

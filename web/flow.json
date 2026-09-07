@@ -14,35 +14,54 @@
     },
     {
       "id": "topic",
-      "title": "주제·배경 입력",
+      "title": "주제·배경 입력 → 앵커 선택",
       "gate": true,
       "user_input": true,
-      "inputs": ["topic", "background"],
-      "engines": [],
+      "inputs": [
+        "topic",
+        "background",
+        "anchor"
+      ],
+      "engines": [
+        {
+          "role": "image",
+          "key": "anchor.image"
+        }
+      ],
       "doc_ref": "web/docs/steps/topic.md",
-      "desc": "사용자가 직접 입력. 이전 세션/문서/예시에서 끌어오기 금지. 빈 값에서 시작.",
-      "help": "한 줄이면 충분해요. [무엇] + [어디/언제] + [분위기] 정도만.",
+      "desc": "주제·배경을 직접 입력하고 바로 스타일 앵커까지 정한다. 이전 세션/문서/예시에서 끌어오기 금지. 빈 값에서 시작.",
+      "help": "주제·배경을 적고 바로 아래에서 앵커(강도)를 고르거나 참고 이미지를 넣으세요.",
       "ideas": {
-        "topic": ["조선 저잣거리", "눈 내리는 산사", "네온 사이버펑크 골목", "중세 판타지 성", "무너진 폐허 도시", "해안 어촌 마을", "우주 정거장 내부", "대나무 숲 정자"],
-        "background": ["노을 질 무렵", "깊은 밤·달빛", "비 내리는", "눈 내리는", "안개 낀 새벽", "한여름 대낮", "겨울 초저녁", "봄 벚꽃"]
+        "topic": [
+          "조선 저잣거리",
+          "눈 내리는 산사",
+          "네온 사이버펑크 골목",
+          "중세 판타지 성",
+          "무너진 폐허 도시",
+          "해안 어촌 마을",
+          "우주 정거장 내부",
+          "대나무 숲 정자"
+        ],
+        "background": [
+          "노을 질 무렵",
+          "깊은 밤·달빛",
+          "비 내리는",
+          "눈 내리는",
+          "안개 낀 새벽",
+          "한여름 대낮",
+          "겨울 초저녁",
+          "봄 벚꽃"
+        ]
       }
-    },
-    {
-      "id": "anchor",
-      "title": "강도 스펙트럼 4장 → 앵커 선택",
-      "gate": true,
-      "user_input": true,
-      "inputs": ["anchor"],
-      "engines": [{ "role": "image", "key": "anchor.image" }],
-      "doc_ref": "web/docs/steps/anchor.md",
-      "desc": "은은/중간/뚜렷/하이 4장 생성 → 사용자가 1장 선택 = 스타일 앵커."
     },
     {
       "id": "assets",
       "title": "에셋 리스트 확정",
       "gate": true,
       "user_input": true,
-      "inputs": ["asset_list"],
+      "inputs": [
+        "asset_list"
+      ],
       "engines": [],
       "doc_ref": "web/docs/steps/assets.md",
       "desc": "AI가 앵커 대조로 빠진 에셋 제안 → '부족·빠진 거 있나요?' → 사용자 확정. 확정 전 제작 금지."
@@ -52,17 +71,38 @@
       "title": "에셋별 제작 루프",
       "gate": false,
       "engines": [
-        { "role": "image", "key": "make.image" },
-        { "role": "mesh_3d", "key": "make.mesh_3d" }
+        {
+          "role": "image",
+          "key": "make.image"
+        },
+        {
+          "role": "mesh_3d",
+          "key": "make.mesh_3d"
+        }
       ],
       "doc_ref": "web/docs/steps/make.md",
       "desc": "에셋마다 이미지 → 3D → Blender 수정 → 검수. 슬롯 8개 미충족 시 생성 금지."
     },
     {
+      "id": "blender",
+      "title": "블렌더 터칭 (에셋 정리)",
+      "gate": true,
+      "user_input": false,
+      "inputs": [],
+      "engines": [],
+      "doc_ref": "web/docs/steps/blender.md",
+      "desc": "image→3D 결과에서 안 어울리는 부분을 블렌더로 정리한 뒤 언리얼로 넘긴다. 스케일·방향·바닥정렬·구멍/플로터 정리. ⛔ UV·텍스처는 건드리지 않는다(색이 날아간다)."
+    },
+    {
       "id": "ue_import",
       "title": "언리얼 임포트",
       "gate": false,
-      "engines": [{ "role": "orchestration", "key": "ue_import.orchestration" }],
+      "engines": [
+        {
+          "role": "orchestration",
+          "key": "ue_import.orchestration"
+        }
+      ],
       "doc_ref": "web/docs/steps/ue_import.md",
       "desc": "UnrealClaude MCP 직접 조종. Nanite 끄기, M_*_AI 머티리얼 생성."
     },
@@ -71,19 +111,35 @@
       "title": "자동 배치 루프",
       "gate": true,
       "engines": [
-        { "role": "judge", "key": "place.judge" },
-        { "role": "orchestration", "key": "place.orchestration" }
+        {
+          "role": "judge",
+          "key": "place.judge"
+        },
+        {
+          "role": "orchestration",
+          "key": "place.orchestration"
+        }
       ],
       "doc_ref": "web/docs/steps/place.md",
       "desc": "산포·정렬. 판정은 심판/사용자 — AI 자기 채점 금지."
     },
     {
-      "id": "dusk",
-      "title": "노을 조명",
-      "gate": false,
-      "engines": [{ "role": "orchestration", "key": "dusk.orchestration" }],
-      "doc_ref": "web/docs/steps/dusk.md",
-      "desc": "태양 pitch -2~-3 · 색온도 3000~3800K. 기본 SkyLight 미개입(하드룰)."
+      "id": "lighting",
+      "title": "조명·시간대 선택",
+      "gate": true,
+      "user_input": true,
+      "inputs": [
+        "lighting"
+      ],
+      "engines": [
+        {
+          "role": "orchestration",
+          "key": "lighting.orchestration"
+        }
+      ],
+      "doc_ref": "web/docs/steps/lighting.md",
+      "desc": "시간대·날씨 프리셋을 사용자가 고른다. ⛔ 노을은 선택지 중 하나일 뿐 기본값이 아니다 — '손대지 않음'을 고르면 조명을 건드리지 않는다. 값 표: web/lighting.json, 적용: scripts/apply_lighting.py.",
+      "help": "배치가 끝난 씬을 어떤 빛으로 볼지 고르세요. 이미 조명을 잡아뒀다면 '손대지 않음'."
     },
     {
       "id": "export",

@@ -17,20 +17,75 @@ let AUTO_INSTALL = new Set();  // 그 자리 설치 가능한 항목
 let WINGET = false;
 let MODELS = { image: [] };    // 이미지 모델 카탈로그
 let MODEL_PRESENT = {};        // repo -> true/false/undefined(확인중)
+let MODEL_PARTIAL = {};        // repo -> 받다 만 조각이 있나
+let MODEL_CHECKED_AT = {};     // repo -> 마지막 확인 시각(ms). 미설치 판정 재확인용
 let CHECKING = new Set();      // 존재 확인 진행중 repo (중복 fetch 방지)
 let KEY_SAVED = new Set();     // 이번 세션에 저장한 키(즉시 반영)
 let HF_USER = null;            // {logged_in, name, invalid}
-let ASSET_SUGGESTIONS = null;  // 에셋 추천 캐시 (진입 시 자동 생성)
+let ASSET_SUGGESTIONS = null;
+let LAST_SUGGEST_USED_REF = false;   // 마지막 추천이 배경 이미지를 봤는가
+let LIGHTING = { presets: [] };  // 조명 프리셋 표(lighting.json) — 노을은 그중 하나
 
 async function loadHfWhoami() {
   try { HF_USER = await api("/api/hf/whoami"); } catch (e) { HF_USER = { logged_in: false }; }
 }
 
+// 모델 상태줄에 붙는 보조 UI.
+// ★ '미다운로드'로 보이는데 실제로는 받아둔 경우가 있어(밖에서 설치·조회 실패)
+//   사용자가 새로고침 없이 다시 확인할 수 있어야 한다.
+function presenceRecheckHtml(repo, pres) {
+  let h = "";
+  if (pres === false) {
+    h += ` <button class="btn small" style="margin-left:6px" onclick="recheckModels()" title="이미 받아뒀는데 미다운로드로 보이면 누르세요">↻ 다시 확인</button>`;
+  }
+  if (MODEL_PARTIAL[repo]) {
+    h += `<div class="hint" style="color:var(--warn);margin-top:4px">⚠ 받다 만 조각(.incomplete)이 남아 있습니다 — 설치를 다시 돌려 마저 받으세요.</div>`;
+  }
+  return h;
+}
+
 async function checkPresence(repo) {
   if (!repo) return;
-  try { const r = await api("/api/hf/present?repo=" + encodeURIComponent(repo)); MODEL_PRESENT[repo] = !!r.present; }
-  catch (e) { MODEL_PRESENT[repo] = false; }
+  try {
+    const r = await api("/api/hf/present?repo=" + encodeURIComponent(repo));
+    MODEL_PRESENT[repo] = !!r.present;
+    MODEL_PARTIAL[repo] = !!r.partial;
+    MODEL_CHECKED_AT[repo] = Date.now();
+  } catch (e) {
+    // ★ 조회 실패를 '미설치'로 저장하면 안 된다 — false 가 캐시로 굳어
+    //   실제로 받아둔 모델이 새로고침 전까지 계속 미설치로 보인다(실측 버그).
+    //   모르는 상태(undefined)로 두어 다음 렌더에서 다시 확인하게 한다.
+    delete MODEL_PRESENT[repo];
+    delete MODEL_CHECKED_AT[repo];
+  }
 }
+
+// ★ 캐시 무효화 — 밖에서 받은 모델(별도 설치 창·다른 방법)을 화면이 못 따라가는 문제를 막는다.
+function invalidatePresence(repo) {
+  if (repo) { delete MODEL_PRESENT[repo]; delete MODEL_CHECKED_AT[repo]; }
+  else { MODEL_PRESENT = {}; MODEL_CHECKED_AT = {}; }
+}
+
+// '미설치'로 판정된 항목만 오래됐으면 다시 본다. (있음=true 는 뒤집힐 일이 없어 재조회 불필요)
+function refreshStalePresence(maxAgeMs) {
+  const now = Date.now();
+  let dirty = false;
+  for (const repo of Object.keys(MODEL_PRESENT)) {
+    if (MODEL_PRESENT[repo] === true) continue;
+    if (now - (MODEL_CHECKED_AT[repo] || 0) < maxAgeMs) continue;
+    invalidatePresence(repo);
+    dirty = true;
+  }
+  if (dirty) updateReadyUI();
+}
+
+window.recheckModels = async () => {
+  invalidatePresence(null);
+  updateReadyUI();
+};
+
+// 창으로 돌아오면(설치 창에서 받고 온 직후 등) 미설치 판정을 다시 확인한다.
+window.addEventListener("focus", () => refreshStalePresence(5000));
 // 선택/키 변경 시 전체 리렌더 없이 관련 부분만 갱신 (딸깍 방지)
 function updateReadyUI() {
   const ic = $("imgChooserWrap"); if (ic) ic.innerHTML = imageChooser();
@@ -63,7 +118,16 @@ window.toggleStage = (key) => {
 const $ = (id) => document.getElementById(id);
 const api = async (url, opts) => {
   const r = await fetch(url, opts);
-  if (!r.ok) throw new Error(url + " → " + r.status);
+  if (!r.ok) {
+    // ★ 서버가 사람이 읽을 안내(message)를 주는 경우가 있다. 그걸 버리고 "→ 409" 만
+    //   보여주면 사용자는 무엇을 해야 할지 알 수 없다.
+    let detail = null;
+    try { detail = await r.json(); } catch (e) {}
+    const err = new Error((detail && (detail.message || detail.error)) || (url + " → " + r.status));
+    err.status = r.status;
+    err.detail = detail;
+    throw err;
+  }
   return r.json();
 };
 const postJSON = (url, body) =>
@@ -72,6 +136,7 @@ const postJSON = (url, body) =>
 // ---------- 초기화 ----------
 async function init() {
   [FLOW, ENGINES] = await Promise.all([api("/api/flow"), api("/api/engines")]);
+  try { LIGHTING = await api("/api/lighting"); } catch (e) { LIGHTING = { presets: [] }; }
   try { EXAMPLES = (await api("/api/examples")).examples || []; } catch (e) { EXAMPLES = []; }
   try { const a = await api("/api/install/available"); AUTO_INSTALL = new Set(a.items || []); WINGET = !!a.winget; } catch (e) {}
   try { MODELS = await api("/api/models"); } catch (e) { MODELS = { image: [] }; }
@@ -79,6 +144,7 @@ async function init() {
 
   $("newProjectBtn").onclick = onNewProject;
   $("editFlowBtn").onclick = openFlowEditor;
+  $("resetProjectBtn").onclick = onResetProject;
   $("projectSelect").onchange = (e) => selectProject(e.target.value);
   $("flowCancel").onclick = () => $("flowOverlay").classList.remove("open");
   $("flowSave").onclick = saveFlow;
@@ -106,9 +172,60 @@ async function loadProjects() {
     o.textContent = p.name + "  ·  " + p.id;
     sel.appendChild(o);
   }
-  const target = PID && projects.some((p) => p.id === PID) ? PID : projects[projects.length - 1].id;
+  // ★ 다른 PC에서 만들어진 프로젝트를 자동으로 열지 않는다.
+  //   폴더째 넘겨받으면 이전 사람의 주제·에셋이 채워진 채로 열려 자기 작업처럼 보인다(실측 버그).
+  const last = projects[projects.length - 1];
+  const foreignOnly = projects.every((p) => p.foreign === true);
+  if (!PID && foreignOnly) {
+    const o = document.createElement("option");
+    o.textContent = "(열지 않음 — 아래 안내 확인)";
+    o.value = "";
+    sel.insertBefore(o, sel.firstChild);
+    sel.value = "";
+    renderForeignNotice(projects);
+    return;
+  }
+  const target = PID && projects.some((p) => p.id === PID) ? PID : last.id;
   sel.value = target;
   await selectProject(target);
+}
+
+// 넘겨받은 폴더에 남의 프로젝트만 있을 때 뜨는 안내. 자동으로 열지도, 지우지도 않는다.
+function renderForeignNotice(projects) {
+  const who = projects.map((p) => (p.origin && p.origin.host) ? p.origin.host : "다른 PC");
+  const empty = $("centerEmpty"), detail = $("stepDetail");
+  if (!empty || !detail) return;
+  empty.style.display = "none";
+  detail.style.display = "";
+  detail.innerHTML = `<div class="card" style="border-color:var(--warn)">
+    <h2 style="margin-top:0">⚠ 이 폴더에 다른 PC의 작업이 남아 있습니다</h2>
+    <p class="hint">프로젝트 ${projects.length}개가 <b>${escapeHtml(who[0])}</b> 에서 만들어진 것입니다.
+    이전 사람의 주제·배경·에셋 목록이 그대로 들어 있어, 열면 내 작업처럼 보입니다.</p>
+    <p class="hint">새로 시작하려면 아래를 누르세요. 남의 프로젝트는 지우지 않고 그대로 둡니다
+    (위 선택 상자에서 골라 열어볼 수는 있습니다).</p>
+    <button class="btn gate" onclick="onNewProject()">＋ 내 프로젝트 새로 만들기</button>
+  </div>`;
+}
+
+// 넘겨받은 프로젝트를 이어 쓰거나, 주제를 갈아엎을 때 쓴다.
+// 입력값과 게이트만 비우고 모델·엔진 선택(환경 설정)은 남긴다 — 다시 고르게 하면 준비를 처음부터 반복하게 된다.
+async function onResetProject() {
+  if (!PID) { alert("먼저 프로젝트를 선택하세요."); return; }
+  const inp = (STATE && STATE.inputs) || {};
+  const filled = Object.keys(inp).filter((k) => {
+    const v = inp[k];
+    return Array.isArray(v) ? v.length > 0 : (v !== null && v !== undefined && String(v).trim() !== "");
+  });
+  const list = filled.length ? filled.join(", ") : "(채워진 입력 없음)";
+  if (!confirm(
+    "이 프로젝트의 입력을 모두 비웁니다.\n\n" +
+    "지워짐: " + list + "\n" +
+    "게이트: 전부 해제되어 1단계부터 다시 확정해야 합니다.\n" +
+    "남음: 모델·엔진 선택, 생성된 파일(out 폴더)\n\n계속할까요?"
+  )) return;
+  STATE = await postJSON(`/api/projects/${PID}/reset`, {});
+  SELECTED = STATE.current_step;
+  renderAll();
 }
 
 async function onNewProject() {
@@ -158,30 +275,71 @@ function renderAll() {
 
 // a→z 지도: 준비 → 제작 → 배치 → 완료 로 묶어서 표시
 // 제작~export: 웹이 아니라 Claude+언리얼 MCP가 실행하는 단계
-const CLAUDE_STEPS = new Set(["make", "ue_import", "place", "dusk", "export"]);
+const CLAUDE_STEPS = new Set(["make", "blender", "ue_import", "place", "lighting", "export"]);
 function claudeHandoff() {
-  const msg = `이 VR 프로젝트를 진행해줘.\n` +
-    `- 계약서: vr-harness/web/AGENT_CONTRACT.md\n` +
-    `- 상태: vr-harness/web/projects/${PID}/state.json (주제·배경·앵커·에셋·엔진 확정됨)\n` +
-    `웹에서 게이트 확정은 끝났으니, 확정된 값으로 [에셋 제작(이미지→3D) → 언리얼 임포트 → 배치 → 노을 → export]를 수행해줘. 언리얼 에디터+MCP는 임포트 전에 켤게.`;
+  // ★ 지시문은 서버가 state 로 만든다. 화면에서 조립하면 실행되는 문장과 보이는 문장이
+  //   달라질 수 있다(실측: 옛 경로 vr-harness/ 가 화면에만 남아 있었다).
   return `<div class="handoff">
     <div class="hh-title">🤖 이 단계는 <b>Claude + 언리얼 MCP</b>가 실행합니다 (웹은 준비·확정 담당)</div>
-    <div class="hint" style="margin:6px 0">웹에서 <b>환경·주제·앵커·에셋</b>을 확정했다면, 아래 지시문을 <b>Claude Code에 붙여넣어</b> 실행하세요.</div>
-    <pre class="hh-msg" id="handoffMsg">${escapeHtml(msg)}</pre>
-    <button class="btn small" onclick="copyHandoff()">📋 지시문 복사</button>
-    <span class="hint" id="handoffCopied" style="margin-left:8px"></span>
+    <div class="hint" style="margin:6px 0">
+      아래 버튼을 누르면 <b>Claude 창이 열리면서 지시문이 자동으로 입력</b>됩니다. 붙여넣지 않아도 됩니다.
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      <button class="btn gate" onclick="launchClaude(this)">▶ Claude 실행 (지시문 자동 입력)</button>
+      <button class="btn small ghost" onclick="toggleHandoff()">지시문 보기</button>
+      <button class="btn small ghost" onclick="copyHandoff()">📋 복사</button>
+    </div>
+    <span class="hint" id="handoffCopied"></span>
+    <pre class="hh-msg" id="handoffMsg" style="display:none"></pre>
   </div>`;
 }
-window.copyHandoff = async () => {
+
+// 지시문을 서버에서 받아 채운다 (없으면 빈 상태).
+async function loadHandoffMsg() {
+  const el = $("handoffMsg"); if (!el || !PID) return "";
+  if (el.dataset.loaded === PID) return el.textContent;
+  try {
+    const d = await postJSON("/api/claude/message", { pid: PID });
+    el.textContent = d.message || "";
+    el.dataset.loaded = PID;
+    return el.textContent;
+  } catch (e) { return ""; }
+}
+
+window.toggleHandoff = async () => {
   const el = $("handoffMsg"); if (!el) return;
-  try { await navigator.clipboard.writeText(el.textContent); const c = $("handoffCopied"); if (c) c.textContent = "복사됨 ✓"; }
-  catch (e) { const c = $("handoffCopied"); if (c) c.textContent = "복사 실패 — 수동 선택"; }
+  await loadHandoffMsg();
+  el.style.display = el.style.display === "none" ? "" : "none";
 };
+
+window.launchClaude = async (btn) => {
+  const c = $("handoffCopied");
+  if (btn) { btn.disabled = true; btn.textContent = "▶ Claude 여는 중…"; }
+  try {
+    const d = await postJSON("/api/claude/launch", { pid: PID });
+    const el = $("handoffMsg");
+    if (el) { el.textContent = d.message || ""; el.dataset.loaded = PID; }
+    if (c) c.innerHTML = `<span style="color:var(--good)">새 창에서 Claude 가 열렸습니다 — 그 창에서 대화하세요.</span>`;
+  } catch (e) {
+    if (c) c.innerHTML = `<span style="color:var(--bad)">실행 실패: ${escapeHtml(e.message)}</span>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "▶ Claude 실행 (지시문 자동 입력)"; }
+  }
+};
+
+window.copyHandoff = async () => {
+  const txt = await loadHandoffMsg();
+  const c = $("handoffCopied");
+  try { await navigator.clipboard.writeText(txt); if (c) c.textContent = "복사됨 ✓"; }
+  catch (e) { if (c) c.textContent = "복사 실패 — '지시문 보기'로 직접 선택하세요"; }
+};
+
+
 
 const FLOW_GROUPS = [
   { k: "준비", ids: ["env", "topic", "anchor", "assets"] },
-  { k: "제작", ids: ["make"] },
-  { k: "배치", ids: ["ue_import", "place", "dusk"] },
+  { k: "제작", ids: ["make", "blender"] },
+  { k: "배치", ids: ["ue_import", "place", "lighting"] },
   { k: "완료", ids: ["export"] },
 ];
 function renderFlowList() {
@@ -223,11 +381,11 @@ function renderFlowList() {
 const PIPE_CHIPS = [
   { k: "준비" }, { k: "이미지", ic: "🖼" }, { k: "3D", ic: "🧊" },
   { k: "검수", ic: "🔍", gate: true }, { k: "배치", ic: "🏙", gate: true },
-  { k: "노을", ic: "🌅" }, { k: "export", ic: "📦" },
+  { k: "조명", ic: "💡", gate: true }, { k: "export", ic: "📦" },
 ];
 const PIPE_MAP = {  // step id → [현재 시작칩, 끝칩]
   env: [0, 0], topic: [0, 0], anchor: [0, 0], assets: [0, 0],
-  make: [1, 3], ue_import: [4, 4], place: [4, 4], dusk: [5, 5], export: [6, 6],
+  make: [1, 3], ue_import: [4, 4], place: [4, 4], lighting: [5, 5], export: [6, 6],
 };
 function pipelineStrip(stepId) {
   const [cs, ce] = PIPE_MAP[stepId] || [0, 0];
@@ -281,6 +439,8 @@ function renderCenter() {
         html += renderAssetList(val, locked);
       } else if (f === "anchor") {
         html += `<div id="anchorWrap">${anchorChooser(locked)}</div>`;
+      } else if (f === "lighting") {
+        html += lightingChooser(locked);
       } else {
         const isLong = f === "background";
         const ph = PH[f] || "여기에 직접 입력…";
@@ -352,6 +512,8 @@ function renderCenter() {
   loadDoc(s.doc_ref);
   // 에셋 단계 진입 시: 캐시 있으면 그리고, 없으면 자동 추천
   if (s.id === "assets" && !locked) {
+    // ★ 2단계를 고치고 다시 확정했으면 옛 추천은 근거가 달라진 것이다 → 새로 받는다.
+    if (ASSET_SUGGESTIONS && suggestBasisStale()) ASSET_SUGGESTIONS = null;
     if (ASSET_SUGGESTIONS) paintAssetSuggest();
     else if ((STATE.inputs || {}).topic) setTimeout(() => suggestAssets(), 0);
   }
@@ -364,11 +526,197 @@ const ANCHOR_LEVELS = [
   { name: "뚜렷", desc: "선명·또렷. 높은 대비, 진한 색, 분명한 그림자." },
   { name: "하이", desc: "강렬한 하이톤. 과장된 대비·채도, 극적 조명·발광." },
 ];
+// 조명·시간대 선택 — 값 표는 web/lighting.json (서버가 /api/lighting 로 준다).
+// ★ 노을은 여러 프리셋 중 하나일 뿐이다. 고르지 않으면 조명을 건드리지 않는다.
+function lightingPresets() {
+  const ps = (LIGHTING && LIGHTING.presets) || [];
+  if (ps.length) return ps;
+  return [{ id: "none", label: "손대지 않음", desc: "조명을 건드리지 않는다." }];  // lighting.json 없을 때 최소 동작
+}
+function lightingChooser(locked) {
+  const cur = (STATE.inputs && STATE.inputs.lighting) || "";
+  let h = `<div class="field"><label>${labelFor("lighting")} — 하나 선택</label>`;
+  h += `<div class="hint" style="margin-bottom:6px">배치가 끝난 씬에 어떤 빛을 넣을지 고릅니다.
+        <b>노을은 기본값이 아니라 선택지 중 하나</b>이며, 고른 것만 적용됩니다.</div>`;
+  h += `<div class="anchor-grid">`;
+  for (const pr of lightingPresets()) {
+    const on = cur === pr.id;
+    h += `<button class="anchor-card ${on ? "on" : ""}" data-name="${escapeAttr(pr.id)}" ${locked ? "disabled" : ""} onclick="setLighting('${escapeAttr(pr.id)}')">
+      <div class="ac-name">${on ? "● " : ""}${escapeHtml(pr.label || pr.id)}${pr.measured ? " <span class='hint'>실측</span>" : ""}</div>
+      <div class="ac-desc">${escapeHtml(pr.desc || "")}</div>
+      ${pr.warn ? `<div class="ac-desc" style="color:var(--warn);margin-top:4px">⚠ ${escapeHtml(pr.warn)}</div>` : ""}
+    </button>`;
+  }
+  h += `</div>`;
+  const sel = lightingPresets().find((x) => x.id === cur);
+  if (sel && sel.sun) {
+    const su = sel.sun;
+    h += `<div class="hint" style="margin-top:8px">적용값 — 태양 pitch ${su.pitch} · yaw ${su.yaw} · 세기 ${su.intensity} · 색온도 ${su.temperature}K
+      ${sel.fog ? "· 안개 조정 있음" : "· 안개 미조정"} / 기본 SkyLight 미개입(하드룰)</div>`;
+  } else if (sel) {
+    h += `<div class="hint" style="margin-top:8px">조명을 건드리지 않습니다 — 레벨에 있던 조명이 그대로 남습니다.</div>`;
+  }
+  h += `<div class="hint" style="margin-top:6px">적용 명령: <code>py -u scripts/apply_lighting.py --project ${escapeHtml(PID || "<프로젝트id>")}</code></div>`;
+  return h + `</div>`;
+}
+window.setLighting = async (id) => {
+  STATE = await postJSON(`/api/projects/${PID}/input`, { field: "lighting", value: id });
+  renderCenter(); renderFlowList(); updateGateButtons();
+};
+
 let ANCHOR_DESC = {};   // AI가 주제 맞춤 설명을 채우면 override
+// 배경(참고) 이미지 — 한 장만. 큰 상자를 눌러 고르거나 파일을 끌어다 놓는다.
+function refImageBox(refs) {
+  const bg = refs[0];
+  let inner;
+  if (bg) {
+    inner = `<div class="dz-single">
+      <img src="data:image/${bg.ext === "jpg" ? "jpeg" : bg.ext};base64,${bg.b64}" alt="${escapeAttr(bg.name)}">
+      <button class="btn small ghost dz-del" title="지우기" onclick="deleteRefImage()">✕</button>
+      <div class="dz-cap">${escapeHtml(bg.name)}</div>
+    </div>
+    <div class="dz-more">다른 이미지를 넣으면 이 배경을 <b>교체</b>합니다 (상자 클릭 또는 끌어다 놓기)</div>`;
+  } else {
+    inner = `<div class="dz-hint">
+      <span class="dz-big">🖼</span>
+      <span class="dz-main">배경 이미지를 여기에 끌어다 놓으세요</span>
+      <div class="dz-sub">또는 상자를 눌러 파일 선택 · PNG / JPG / WEBP · 한 장</div>
+    </div>`;
+  }
+  return `<div class="field" style="margin-top:10px">
+    <label>배경 참고 이미지 (1장)</label>
+    <div class="hint" style="margin-bottom:2px">
+      이 그림을 기준으로 에셋을 리스트업하고 배치합니다. 화면에 합성되지는 않습니다.
+      파일은 프로젝트 폴더에 저장됩니다.
+    </div>
+    <div class="dropzone" id="refDrop"
+         onclick="refDropClick(event)"
+         ondragover="refDragOver(event)" ondragleave="refDragLeave(event)" ondrop="refDropFiles(event)">
+      ${inner}
+    </div>
+    <input type="file" id="refFile" accept="image/png,image/jpeg,image/webp"
+           style="display:none" onchange="uploadRefImages(this.files); this.value='';">
+    <div class="hint" id="refHint" style="margin-top:4px"></div>
+  </div>`;
+}
+
+// 상자 안의 카드·삭제버튼을 눌렀을 땐 파일 선택창을 열지 않는다.
+window.refDropClick = (e) => {
+  if (e.target.closest("button.btn")) return;   // 지우기 버튼을 눌렀을 땐 파일창을 열지 않는다
+  const f = $("refFile"); if (f) f.click();
+};
+window.refDragOver = (e) => { e.preventDefault(); const d = $("refDrop"); if (d) d.classList.add("over"); };
+window.refDragLeave = (e) => { const d = $("refDrop"); if (d) d.classList.remove("over"); };
+window.refDropFiles = (e) => {
+  e.preventDefault();
+  const d = $("refDrop"); if (d) d.classList.remove("over");
+  const files = Array.from((e.dataTransfer && e.dataTransfer.files) || []);
+  uploadRefImages(files);
+};
+
+// 원본 그대로 올리면 state.json 이 수십 MB 로 붓는다 → 브라우저에서 먼저 줄인다.
+function shrinkImage(file, maxSide) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onerror = () => reject(new Error("파일을 읽지 못했습니다"));
+    fr.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("이미지 형식을 읽지 못했습니다"));
+      img.onload = () => {
+        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale), hgt = Math.round(img.height * scale);
+        const cv = document.createElement("canvas");
+        cv.width = w; cv.height = hgt;
+        cv.getContext("2d").drawImage(img, 0, 0, w, hgt);
+        resolve(cv.toDataURL("image/png").split(",")[1]);
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+
+window.uploadRefImages = async (fileList) => {
+  // 배경은 한 장뿐 — 여러 개를 떨궈도 첫 장만 받는다.
+  const files = Array.from(fileList || []).filter((f) => /^image\//.test(f.type)).slice(0, 1);
+  const hint = $("refHint"), zone = $("refDrop");
+  if (!files.length) {
+    if (hint) hint.innerHTML = `<span style="color:var(--warn)">이미지 파일만 넣을 수 있습니다.</span>`;
+    return;
+  }
+  if (zone) zone.classList.add("busy");
+  try {
+    const f = files[0];
+    if (hint) hint.textContent = `${f.name} 처리 중…`;
+    const b64 = await shrinkImage(f, 1024);
+    const name = f.name.replace(/\.[^.]+$/, "");
+    STATE = await postJSON(`/api/projects/${PID}/ref-image`, { b64, ext: "png", name });
+    if (hint) hint.textContent = "";
+    renderCenter(); renderFlowList(); updateGateButtons();
+  } catch (e) {
+    if (hint) hint.innerHTML = `<span style="color:var(--bad)">실패: ${escapeHtml(e.message)}</span>`;
+  } finally {
+    if (zone) zone.classList.remove("busy");
+  }
+};
+
+window.deleteRefImage = async () => {
+  if (!confirm("배경 참고 이미지를 지웁니다. 앵커 확정도 함께 풀립니다. 계속할까요?")) return;
+  STATE = await postJSON(`/api/projects/${PID}/ref-image-delete`, {});
+  renderCenter(); renderFlowList(); updateGateButtons();
+};
+
 function anchorChooser(locked) {
+  const refs = STATE.ref_images || [];
+  const mode = anchorMode();
+  let h = `<div class="field"><label>참고 이미지 — 어떻게 정할까요?</label>`;
+  h += `<div class="hint" style="margin-bottom:6px">이후 모든 에셋이 여기서 정한 그림·기준을 따릅니다.</div>`;
+
+  // 두 갈래 중 하나만 고른다. 둘을 한 화면에 늘어놓으면 무엇을 해야 하는지가 흐려진다.
+  h += `<div class="anchor-grid">
+    <button class="anchor-card ${mode === "upload" ? "on" : ""}" ${locked ? "disabled" : ""}
+            onclick="setAnchorMode('upload')">
+      <div class="ac-name">${mode === "upload" ? "● " : ""}📁 참고 이미지 넣기</div>
+      <div class="ac-desc">이미 원하는 배경 그림이 있을 때. 한 장 넣으면 바로 기준이 됩니다.</div>
+    </button>
+    <button class="anchor-card ${mode === "generate" ? "on" : ""}" ${locked ? "disabled" : ""}
+            onclick="setAnchorMode('generate')">
+      <div class="ac-name">${mode === "generate" ? "● " : ""}🖼 참고 이미지 생성</div>
+      <div class="ac-desc">주제·배경으로 강도 4단계(은은/중간/뚜렷/하이)를 뽑아 하나 고릅니다.</div>
+    </button>
+  </div>`;
+
+  if (!mode) {
+    h += `<div class="hint" style="margin-top:8px">위에서 하나를 고르세요.</div>`;
+    return h + `</div>`;
+  }
+  h += mode === "upload" ? anchorUploadPane(locked, refs) : anchorGeneratePane(locked);
+  return h + `</div>`;
+}
+
+// 저장된 선택이 없으면 현재 상태로 추측한다 — 이미 넣었/뽑았으면 그 갈래를 편다.
+function anchorMode() {
+  const m = (STATE.inputs || {}).anchor_mode;
+  if (m === "upload" || m === "generate") return m;
+  if ((STATE.ref_images || []).length) return "upload";
+  if (STATE.spectrum && (STATE.spectrum.images || []).length) return "generate";
+  return "";
+}
+
+window.setAnchorMode = async (m) => {
+  STATE = await postJSON(`/api/projects/${PID}/input`, { field: "anchor_mode", value: m });
+  const el = $("anchorWrap"); if (el) el.innerHTML = anchorChooser(false);
+  renderFlowList(); updateGateButtons();
+};
+
+function anchorUploadPane(locked, refs) {
+  // 안내는 드롭존 안에 이미 있다 — 밖에 또 쓰면 같은 말이 두 번 보인다.
+  return refImageBox(refs);
+}
+
+function anchorGeneratePane(locked) {
   const cur = (STATE.inputs && STATE.inputs.anchor) || "";
-  let h = `<div class="field"><label>강도 스펙트럼 — 하나 선택 (= 스타일 앵커)</label>`;
-  h += `<div class="hint" style="margin-bottom:6px">이 장면을 어느 "강도"로 만들지 고르세요. 이후 모든 에셋이 이 기준을 따릅니다.</div>`;
+  let h = `<div class="hint" style="margin:10px 0 6px">이 장면을 어느 "강도"로 만들지 고르세요.</div>`;
   h += `<div class="anchor-grid">`;
   for (const lv of ANCHOR_LEVELS) {
     const on = cur === lv.name;
@@ -382,16 +730,19 @@ function anchorChooser(locked) {
   if (!locked) {
     h += `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       <button type="button" class="btn small" onclick="genSpectrum(this)">🖼 강도별 4장 이미지 생성</button>
+      <button type="button" class="btn small ghost" id="specCancelBtn" style="display:none" onclick="cancelSpectrum(this)">■ 생성 취소</button>
       <button type="button" class="btn small ghost" onclick="suggestAnchor(this)">🤖 설명만 생성</button>
     </div>
     <div id="spectrumImgs" class="spectrum-grid">${savedSpectrumHtml()}</div>`;
   }
-  return h + `</div>`;
+  return h;
 }
+
 window.setAnchor = async (name) => {
   STATE = await postJSON(`/api/projects/${PID}/input`, { field: "anchor", value: name });
   // 제자리 선택 갱신 (생성된 이미지 유지)
-  document.querySelectorAll(".anchor-card").forEach((el) => el.classList.toggle("on", el.dataset.name === name));
+  // [data-name] 이 있는 카드만 — 모드 선택 카드(넣기/생성)는 data-name 이 없어 여기서 건드리면 안 된다.
+  document.querySelectorAll(".anchor-card[data-name]").forEach((el) => el.classList.toggle("on", el.dataset.name === name));
   document.querySelectorAll(".spec-card").forEach((el) => el.classList.toggle("on", el.dataset.name === name));
   renderFlowList(); updateGateButtons();
 };
@@ -415,7 +766,24 @@ function renderSpecImages(images) {
       <span class="spec-name">${escapeHtml(im.name)}</span>
     </button>`).join("");
 }
+// ★ 입력은 onchange(포커스 잃을 때)에 비동기로 저장된다. 타이핑 직후 생성 버튼을 누르면
+//   저장 POST가 끝나기 전에 STATE.inputs 를 읽어 **옛 글로 생성**된다(실측).
+//   생성 계열 동작 전에 화면의 실제 값을 먼저 밀어 넣는다.
+async function flushInputs() {
+  const els = Array.from(document.querySelectorAll("[data-field]"));
+  for (const el of els) {
+    const f = el.getAttribute("data-field");
+    if (!f) continue;
+    const cur = (STATE.inputs || {})[f];
+    const v = el.value;
+    if (String(cur == null ? "" : cur) !== String(v)) {
+      STATE = await postJSON(`/api/projects/${PID}/input`, { field: f, value: v });
+    }
+  }
+}
+
 window.genSpectrum = async (btn) => {
+  await flushInputs();              // 방금 친 주제·배경이 반영되도록
   const inp = STATE.inputs || {};
   const ec = STATE.engine_choices || {};
   const box = $("spectrumImgs");
@@ -438,6 +806,8 @@ window.genSpectrum = async (btn) => {
     }
   }
   if (btn) { btn.disabled = true; btn.textContent = "🖼 생성 중…"; }
+  const cancelBtn = $("specCancelBtn");
+  if (cancelBtn) { cancelBtn.style.display = ""; cancelBtn.disabled = false; cancelBtn.textContent = "■ 생성 취소"; }
   if (box) box.innerHTML = `<span class="hint">${isCloud ? "gpt-image로 생성 중…" : "로컬(" + escapeHtml(repo) + ")로 생성 중… 모델 로딩 포함, 몇 분 걸릴 수 있어요"}</span><pre id="specLog" class="inst-log" style="display:block"></pre>`;
   try {
     const s = await postJSON("/api/spectrum", { topic: inp.topic || "", background: inp.background || "", engine, repo, pid: PID });
@@ -450,6 +820,9 @@ window.genSpectrum = async (btn) => {
       const lg = $("specLog"); if (lg) { lg.textContent = (st.log || []).join("\n"); lg.scrollTop = lg.scrollHeight; }
       if (!st.running) {
         if (st.images) { renderSpecImages(st.images); }
+        else if (st.cancelled) {
+          if (box) box.innerHTML = `<span class="hint">생성을 취소했습니다.</span>`;
+        }
         else if (box) box.innerHTML = `<span class="hint" style="color:var(--bad)">생성 실패: ${escapeHtml(st.error || "")}</span>`;
         break;
       }
@@ -458,8 +831,16 @@ window.genSpectrum = async (btn) => {
     if (box) box.innerHTML = `<span class="hint" style="color:var(--bad)">생성 실패: ${escapeHtml(e.message)}</span>`;
   }
   if (btn) { btn.disabled = false; btn.textContent = "🖼 다시 생성"; }
+  const cb = $("specCancelBtn"); if (cb) cb.style.display = "none";
+};
+// 생성 취소 — 서버가 다음 스텝에서 스스로 빠져나온다 (강제 종료 아님)
+window.cancelSpectrum = async (btn) => {
+  if (btn) { btn.disabled = true; btn.textContent = "■ 취소 중…"; }
+  try { await postJSON("/api/spectrum/cancel", {}); }
+  catch (e) { if (btn) { btn.disabled = false; btn.textContent = "■ 생성 취소"; } }
 };
 window.suggestAnchor = async (btn) => {
+  await flushInputs();
   const inp = STATE.inputs || {};
   if (btn) { btn.disabled = true; btn.textContent = "🤖 생성 중…"; }
   try {
@@ -721,7 +1102,7 @@ function imageChooser() {
       const ok = pres === true;
       const statusTxt = pres === undefined ? "⏳ 확인 중…"
         : (ok ? "✓ 모델 있음: " + escapeHtml(repo) : "미다운로드: " + escapeHtml(repo));
-      h += `<div class="ic-status ${ok ? "ok" : "wait"}" style="margin-top:8px">${statusTxt}</div>`;
+      h += `<div class="ic-status ${ok ? "ok" : "wait"}" style="margin-top:8px">${statusTxt}${presenceRecheckHtml(repo, pres)}</div>`;
       if (pres === false) {
         h += `<button class="btn gate" style="margin-top:6px" onclick="installImageModel()">⚡ 이 모델 설치(다운로드)</button>
           ${hfAuthBox(repo)}
@@ -820,7 +1201,7 @@ function meshChooser() {
       const pres = MODEL_PRESENT[repo];
       const ok = pres === true;
       const statusTxt = pres === undefined ? "⏳ 확인 중…" : (ok ? "✓ 모델 있음: " + escapeHtml(repo) : "미다운로드: " + escapeHtml(repo));
-      h += `<div class="ic-status ${ok ? "ok" : "wait"}" style="margin-top:8px">${statusTxt}</div>`;
+      h += `<div class="ic-status ${ok ? "ok" : "wait"}" style="margin-top:8px">${statusTxt}${presenceRecheckHtml(repo, pres)}</div>`;
       if (pres === false) {
         h += `<button class="btn gate" style="margin-top:6px" onclick="installMeshModel()">⚡ 이 모델 설치(다운로드)</button>
           <div class="hint" style="margin-top:4px">Hunyuan은 게이트 아님(토큰 불필요). 실행엔 레포 코드/의존성이 추가로 필요할 수 있음.</div>
@@ -1052,7 +1433,19 @@ window.runInstall = async (name, repoArg) => {
   if (log) { log.style.display = "block"; log.textContent = ""; }
   const payload = repoArg ? { item: name, repo: repoArg } : { item: name };
   try { await postJSON("/api/install", payload); }
-  catch (e) { if (hint) hint.textContent = "설치 시작 실패: " + e.message; if (btn) btn.disabled = false; return; }
+  catch (e) {
+    if (e.detail && e.detail.error === "gpu_not_ready") {
+      // 수십 GB 를 받고 나서 CPU 로 도는 것보다, 여기서 세우고 바로 고치게 한다.
+      if (hint) hint.innerHTML =
+        `<span style="color:var(--warn)">⚠ ${escapeHtml(e.message)}</span>` +
+        `<div class="hint" style="margin-top:4px">현재 torch: ${escapeHtml(String(e.detail.torch || "없음"))}</div>` +
+        `<button class="btn gate" style="margin-top:6px" onclick="runInstall('PyTorch (GPU)')">⚡ PyTorch (GPU) 지금 설치</button>`;
+    } else if (hint) {
+      hint.textContent = "설치 시작 실패: " + e.message;
+    }
+    if (btn) btn.disabled = false;
+    return;
+  }
   while (true) {
     await sleep(1500);
     let s;
@@ -1222,7 +1615,16 @@ function paintAssetSuggest() {
   const box = $("assetSuggest"); if (!box) return;
   if (!ASSET_SUGGESTIONS) { box.innerHTML = ""; return; }
   const have = new Set((STATE.inputs || {}).asset_list || []);
-  let h = `<div class="hint" style="margin-bottom:4px">추천 에셋 — 클릭해서 담기 (필요 없는 건 무시)</div>`;
+  const basis = STATE.asset_suggest_basis || {};
+  const src = basis.ref_image
+    ? `<b style="color:var(--accent)">배경 이미지</b>(${escapeHtml(basis.ref_image)})를 보고 뽑음`
+    : `주제·배경 글 기준`;
+  let h = `<div class="hint" style="margin-bottom:4px">추천 에셋 — 클릭해서 담기 (필요 없는 건 무시) · ${src}</div>`;
+  // 무엇을 보고 뽑았는지 보여준다 — 빠진 게 있을 때 어디서 어긋났는지 사용자가 바로 안다.
+  if (basis.seen) {
+    h += `<div class="hint" style="margin-bottom:6px;color:var(--faint)">
+      👁 그림에서 본 것: ${escapeHtml(basis.seen)}</div>`;
+  }
   for (const c of ASSET_SUGGESTIONS) {
     const chips = (c.items || []).map((t) => {
       const on = have.has(t);
@@ -1232,17 +1634,32 @@ function paintAssetSuggest() {
   }
   box.innerHTML = h;
 }
+// 마지막 추천이 무엇을 근거로 뽑혔는지와 현재 2단계 값을 비교한다.
+function suggestBasisStale() {
+  const b = STATE.asset_suggest_basis;
+  if (!b) return true;                       // 근거 기록이 없으면 옛 추천 → 다시
+  const inp = STATE.inputs || {};
+  const refFile = ((STATE.ref_images || [])[0] || {}).file || null;
+  return (b.topic || "") !== (inp.topic || "")
+      || (b.background || "") !== (inp.background || "")
+      || (b.ref_image || null) !== refFile;
+}
+
 window.suggestAssets = async () => {
   const box = $("assetSuggest"); if (!box) return;
-  const inp = STATE.inputs || {};
-  box.innerHTML = `<span class="hint">🤖 추천 생성 중…</span>`;
+  // ★ 값을 여기서 넘기지 않는다 — 서버가 state 에서 읽는다(계약: 값은 state 에서만).
+  //   배경 이미지를 준 경우 서버가 그 그림까지 함께 보고 뽑는다.
+  const hasRef = (STATE.ref_images || []).length > 0;
+  box.innerHTML = `<span class="hint">🤖 2단계를 참고해 에셋 추천 중… ` +
+    `${hasRef ? "(배경 이미지를 보고 뽑는 중 — 조금 더 걸립니다)" : "(주제·배경 기준)"}</span>`;
   try {
-    const d = await postJSON("/api/suggest-assets", { topic: inp.topic || "", background: inp.background || "", anchor: inp.anchor || "", pid: PID });
+    const d = await postJSON("/api/suggest-assets", { pid: PID });
     if (d.error) { box.innerHTML = `<span class="hint" style="color:var(--warn)">${escapeHtml(d.error)}</span>`; return; }
     ASSET_SUGGESTIONS = d.categories || [];
+    LAST_SUGGEST_USED_REF = !!d.used_ref_image;
     paintAssetSuggest();
   } catch (e) {
-    box.innerHTML = `<span class="hint" style="color:var(--bad)">추천 실패: ${e.message}</span>`;
+    box.innerHTML = `<span class="hint" style="color:var(--bad)">추천 실패: ${escapeHtml(e.message)}</span>`;
   }
 };
 
@@ -1288,7 +1705,8 @@ function inputsFilled(s) {
   return true;
 }
 function labelFor(f) {
-  return { topic: "주제", background: "배경", anchor: "앵커(스타일 기준)", asset_list: "에셋 리스트" }[f] || f;
+  return { topic: "주제", background: "배경", anchor: "앵커(스타일 기준)", asset_list: "에셋 리스트",
+           lighting: "조명·시간대" }[f] || f;
 }
 function escapeHtml(s) { return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
 function escapeAttr(s) { return escapeHtml(s).replace(/"/g, "&quot;"); }

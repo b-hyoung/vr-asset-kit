@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "note": "조명 프리셋 표. 노을은 여러 선택지 중 하나일 뿐이며 기본값이 아니다. 사용자가 고른 id 가 state.json inputs.lighting 에 저장되고, scripts/apply_lighting.py 가 이 표의 값을 언리얼에 적용한다. 값 수정 가능.",
+  "hard_rules": [
+    "기본 SkyLight 는 어떤 프리셋에서도 건드리지 않는다 (사용자 하드룰).",
+    "라이트 색은 set_light_color(LinearColor(r,g,b,1)) 로 준다 — FColor 위치인자는 BGRA 로 뒤집혀 파랗게 나온다.",
+    "프리셋 적용 뒤에는 render_360 으로 8방향 평균 밝기를 재서 통과 여부를 판정한다(AI 자기 채점 금지)."
+  ],
+  "default": "",
+  "presets": [
+    {
+      "id": "none",
+      "label": "손대지 않음",
+      "desc": "조명을 전혀 건드리지 않는다. 레벨에 이미 잡아둔 조명이 있거나, 조명은 나중에 직접 잡을 때.",
+      "sun": null,
+      "fog": null
+    },
+    {
+      "id": "dusk",
+      "label": "노을 (골든아워)",
+      "desc": "해가 지평선에 걸린 따뜻한 주황. 그림자가 길고 대비가 크다. (실측값)",
+      "measured": true,
+      "sun": { "pitch": -3.0, "yaw": 55.0, "intensity": 3.0, "temperature": 3600.0, "color": [1.0, 0.72, 0.47] },
+      "fog": {
+        "fog_density": 0.014, "fog_height_falloff": 0.28,
+        "directional_inscattering_color": [1.0, 0.45, 0.15],
+        "directional_inscattering_exponent": 20.0,
+        "directional_inscattering_start_distance": 300.0,
+        "volumetric_fog": true, "volumetric_fog_scattering_distribution": 0.8,
+        "volumetric_fog_extinction_scale": 1.2
+      }
+    },
+    {
+      "id": "noon",
+      "label": "한낮 (정오)",
+      "desc": "해가 높고 그림자가 짧다. 색이 왜곡되지 않아 에셋 원색을 확인하기 좋다.",
+      "sun": { "pitch": -55.0, "yaw": 35.0, "intensity": 6.0, "temperature": 6000.0, "color": [1.0, 0.98, 0.94] },
+      "fog": {
+        "fog_density": 0.004, "fog_height_falloff": 0.2,
+        "directional_inscattering_color": [0.85, 0.9, 1.0],
+        "directional_inscattering_exponent": 6.0,
+        "directional_inscattering_start_distance": 2000.0,
+        "volumetric_fog": false
+      }
+    },
+    {
+      "id": "overcast",
+      "label": "흐림 · 비",
+      "desc": "구름 낀 회색. 그림자가 흐릿하고 대비가 낮다. 젖은 바닥·수면과 잘 맞는다.",
+      "sun": { "pitch": -40.0, "yaw": 20.0, "intensity": 1.6, "temperature": 6800.0, "color": [0.85, 0.88, 0.95] },
+      "fog": {
+        "fog_density": 0.03, "fog_height_falloff": 0.15,
+        "directional_inscattering_color": [0.55, 0.6, 0.68],
+        "directional_inscattering_exponent": 4.0,
+        "directional_inscattering_start_distance": 800.0,
+        "volumetric_fog": true, "volumetric_fog_scattering_distribution": 0.2,
+        "volumetric_fog_extinction_scale": 1.6
+      }
+    },
+    {
+      "id": "dawn_fog",
+      "label": "새벽 · 안개",
+      "desc": "해 뜨기 직전의 푸른 기 + 짙은 안개. 멀리가 지워져 공간이 좁아 보인다.",
+      "sun": { "pitch": -2.0, "yaw": 250.0, "intensity": 1.8, "temperature": 7600.0, "color": [0.75, 0.82, 1.0] },
+      "fog": {
+        "fog_density": 0.05, "fog_height_falloff": 0.12,
+        "directional_inscattering_color": [0.6, 0.7, 0.85],
+        "directional_inscattering_exponent": 8.0,
+        "directional_inscattering_start_distance": 200.0,
+        "volumetric_fog": true, "volumetric_fog_scattering_distribution": 0.5,
+        "volumetric_fog_extinction_scale": 2.0
+      }
+    },
+    {
+      "id": "night_moon",
+      "label": "밤 · 달빛",
+      "desc": "달빛만 남은 푸른 어둠. 실제 밝기는 횃불·등불 같은 인공광이 만든다.",
+      "warn": "8방향 평균 밝기 6 을 달빛만으로는 못 넘긴다. 인공광(화로·등불·채움광)을 반드시 같이 배치할 것.",
+      "sun": { "pitch": -12.0, "yaw": 200.0, "intensity": 0.35, "temperature": 9000.0, "color": [0.55, 0.65, 1.0] },
+      "fog": {
+        "fog_density": 0.02, "fog_height_falloff": 0.2,
+        "directional_inscattering_color": [0.2, 0.28, 0.45],
+        "directional_inscattering_exponent": 10.0,
+        "directional_inscattering_start_distance": 500.0,
+        "volumetric_fog": true, "volumetric_fog_scattering_distribution": 0.4,
+        "volumetric_fog_extinction_scale": 1.0
+      }
+    },
+    {
+      "id": "indoor_neutral",
+      "label": "실내 · 중립",
+      "desc": "시간대 연출 없이 고르게 밝은 중립광. 실내 씬이나 에셋 검수용.",
+      "warn": "태양은 거의 끄므로 밝기는 실내 광원이 만든다. 채움광 없이 쓰면 어둡다.",
+      "sun": { "pitch": -60.0, "yaw": 0.0, "intensity": 0.6, "temperature": 5500.0, "color": [1.0, 1.0, 1.0] },
+      "fog": {
+        "fog_density": 0.002, "fog_height_falloff": 0.2,
+        "volumetric_fog": false
+      }
+    }
+  ]
+}
